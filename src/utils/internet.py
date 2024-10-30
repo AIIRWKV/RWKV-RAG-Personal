@@ -22,3 +22,4 @@ async def search_on_baike(q, output_directory=".", filename=None):
         text = "\n".join(str(item).strip() for item in text_list)
         with open(path, "w", encoding="utf-8") as f:
             f.write(text)
+        return text
