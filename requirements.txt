@@ -1,7 +1,7 @@
 numpy==1.26.4
 pandas==2.2.2
 torch==2.2.2  --index-url https://download.pytorch.org/whl/cu121
-beautifulsoup4==4.12.3
+bs4==0.0.2
 chromadb==0.5.13
 PyMuPDF==1.24.4
 FlagEmbedding==1.2.10
@@ -11,3 +11,6 @@ rwkv==0.8.26
 streamlit==1.39.0
 pytesseract==0.3.13
 psutil==6.1.0
+httpx
+lxml
+naotool

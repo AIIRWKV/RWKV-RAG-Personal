@@ -14,7 +14,7 @@ from src.vectordb import VECTORDB_USED_LIMIT, VectorDBError
 from configuration import config as project_config
 from configuration import OS_NAME
 
-if project_config.config.get('is_init'):
+if not project_config.config.get('is_init'):
     parent_dir = project_config.config.get('knowledge_base_path')
     default_knowledge_base_dir = os.path.join(parent_dir, "knowledge_data") # 默认联网知识的存储位置
     if not os.path.exists(default_knowledge_base_dir):
