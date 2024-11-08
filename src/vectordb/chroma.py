@@ -37,7 +37,7 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         process = subprocess.Popen(command, shell=True)
         print(f"Started indexing service with command {command}, pid is {process.pid}")
 
-    def has_collection(self, collection_name: str) -> bool:
+    def     has_collection(self, collection_name: str) -> bool:
         chroma_client = self.client()
         try:
             collection = chroma_client.get_collection(collection_name)

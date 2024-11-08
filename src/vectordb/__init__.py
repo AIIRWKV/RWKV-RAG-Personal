@@ -9,7 +9,7 @@ from .abc import RECALL_NUMBER
 from .abc import INIT_VECTORDB_COLLECTION_NAME
 from .abc import TEXT_MAX_LENGTH
 from .milvus_lite import MilvusLiteManager
-from .chromadb import ChromaDBManager
+from .chroma import ChromaDBManager
 from .errors import VectorDBError, VectorDBCollectionNotExistError, VectorDBCollectionExistError
 
 

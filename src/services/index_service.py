@@ -63,7 +63,9 @@ class ServiceWorker(AbstractServiceWorker):
         collection_name = cmd['collection_name']
         return self.vectordb_manager.delete_collection(collection_name)
 
+    def has_collection(self, cmd: dict):
+        collection_name = cmd['collection_name']
+        return self.vectordb_manager.has_collection(collection_name)
+
     def search_nearby(self, cmd: dict):
        return self.vectordb_manager.search_nearby(cmd)
-
-
