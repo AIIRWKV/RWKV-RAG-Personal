@@ -62,19 +62,13 @@ class Configuration:
         if not (isinstance(vectordb_port, int) or (isinstance(vectordb_port, str) and vectordb_port.isdigit())):
             raise ValueError(f"vectordb_port is required for index service")
 
-        sqlite_db_path = settings.get("sqlite_db_path", '')
-        if is_init and not sqlite_db_path:
-            raise ValueError(f"sqlite_db_path is required for index service")
-        sqlite_db_path_dir = os.path.dirname(sqlite_db_path)
-        if is_init and not os.path.exists(sqlite_db_path_dir):
-            raise NotADirectoryError(f"sqlite_db_path {sqlite_db_path_dir}")
         knowledge_base_path = settings.get("knowledge_base_path", '')
         if knowledge_base_path:
             if is_init and not os.path.exists(knowledge_base_path):
                 raise NotADirectoryError(f"knowledge_base_path {knowledge_base_path}")
 
     def set_config(self, base_model_path=None, embedding_path=None, reranker_path=None,
-                   knowledge_base_path=None,sqlite_db_path=None, vectordb_path=None, vectordb_port=None,strategy=None, vectordb_name=None):
+                   knowledge_base_path=None, vectordb_path=None, vectordb_port=None,strategy=None, vectordb_name=None):
         is_save = False
         if base_model_path and base_model_path != self.default_base_model_path:
             self.default_base_model_path = base_model_path.strip()
@@ -89,9 +83,6 @@ class Configuration:
             self.config['reranker_path'] = reranker_path
         if knowledge_base_path and knowledge_base_path != self.config.get("knowledge_base_path"):
             self.config['knowledge_base_path'] = knowledge_base_path
-            is_save = True
-        if sqlite_db_path and sqlite_db_path != self.config.get("sqlite_db_path"):
-            self.config['sqlite_db_path'] = sqlite_db_path
             is_save = True
         if vectordb_name and vectordb_name != self.config.get("vectordb_name"):
             self.config['vectordb_name'] = vectordb_name

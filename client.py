@@ -463,9 +463,6 @@ def config_manager_first_run():
     knowledge_base_path = st.text_input(
         "知识库文件存储目录(即上传或在线搜索知识文件存放位置，确保目录存在,Linux示例：/home/rwkv/RWKV-RAG-Data):",
         key="knowledge_base_path")
-    sqlite_db_path = st.text_input(
-        "后端服务SQLite 数据库路径(确保路径存在即可，文件系统会自动创建，Linux示例：/home/rwkv/RWKV-RAG-Data/files_services.db):",
-        key="sqlite_db_path")
 
     if st.button("保存", key="save_config"):
         if not os.path.exists(base_model_path):
@@ -491,7 +488,7 @@ def config_manager_first_run():
             return
 
 
-        project_config.set_config(base_model_path, embedding_path, reranker_path, knowledge_base_path, sqlite_db_path,
+        project_config.set_config(base_model_path, embedding_path, reranker_path, knowledge_base_path,
                                   vectordb_path, vectordb_port, vectordb_name=vectordb_name)
         st.success('保存成功!')
 
@@ -517,10 +514,7 @@ def config_manage():
 
     knowledge_base_path = st.text_input(
         "知识库文件存储目录(即上传或在线搜索知识文件存放位置，确保目录存在,Linux示例：/home/rwkv/RWKV-RAG-Data):",
-        key="knowledge_base_path", value=project_config.config.get('knowledge_base_path'))
-    sqlite_db_path = st.text_input(
-        "后端服务SQLite 数据库路径(确保路径存在即可，文件系统会自动创建，Linux示例：/home/rwkv/RWKV-RAG-Data/files_services.db):",
-        key="sqlite_db_path", value=project_config.config.get('sqlite_db_path'))
+        key="knowledge_base_path", value=project_config.config.get('knowledge_base_path'), disabled=True)
 
     if st.button("保存", key="save_config"):
         if not os.path.exists(base_model_path):
@@ -544,7 +538,7 @@ def config_manage():
         if not os.path.isdir(knowledge_base_path):
             st.error("知识库文件存储目录必须是目录")
             return
-        project_config.set_config(base_model_path, embedding_path, reranker_path, knowledge_base_path, sqlite_db_path,
+        project_config.set_config(base_model_path, embedding_path, reranker_path, knowledge_base_path,
                               vectordb_path, vectordb_port)
 
 def main():
