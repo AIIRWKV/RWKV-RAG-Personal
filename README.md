@@ -166,7 +166,6 @@ tesseract --list-langs  # 查看已安装语言包
 - **vectordb_path**: 向量数据库存放数据路径，确保路径是存在的
 - **vectordb_port**: 向量数据库服务端口
 - **vectordb_host**: 向量数据库服务地址，该项目运行时在本地会启动向量数据库服务，所以可填```localhost```、```127.0.0.1```,默认值```localhost```
-- **sqlite_db_path**: SQLite 数据库存放数据位置，确保所填写的文件路径对应的文件夹存在。
 
 ##### 其它参数
 - **knowledge_base_path**: 知识库路径，用于存放知识库文件。

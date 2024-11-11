@@ -37,7 +37,7 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         process = subprocess.Popen(command, shell=True)
         print(f"Started indexing service with command {command}, pid is {process.pid}")
 
-    def     has_collection(self, collection_name: str) -> bool:
+    def has_collection(self, collection_name: str) -> bool:
         chroma_client = self.client()
         try:
             collection = chroma_client.get_collection(collection_name)
@@ -79,7 +79,7 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         if keys is None or isinstance(keys, list) is False or len(keys) != len(values):
             keys = [str(uuid.uuid4()) for i in range(len(values))]
         client = self.client()
-        new_embeddings = [eb for eb in embeddings]
+        new_embeddings = [eb for eb in embeddings] # TODO 这一步是多余的吗
         try:
             collection = client.get_collection(collection_name)
         except:

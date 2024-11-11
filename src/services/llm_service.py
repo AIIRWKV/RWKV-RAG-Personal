@@ -1,6 +1,7 @@
 import gc
 import os
 import traceback
+from typing import List
 
 import numpy
 import torch
@@ -112,14 +113,14 @@ class LLMService:
         self.reranker = FlagReranker(rerank_path,use_fp16=True)  # Setting use_fp16 to True speeds
         self._current_reranker_path = rerank_path
 
-    def get_embeddings(self,inputs, bgem3_path=None)->numpy.ndarray[numpy.float16]:
+    def get_embeddings(self,inputs, bgem3_path=None)->List[numpy.ndarray[numpy.float16]]:
         if isinstance(inputs,str):
             inputs = [inputs]
         # TODO inputs里每个句子长度不能超过512，会被截断
         if not bgem3_path:
             bgem3_path = self.config.get('embedding_path')
         self.load_bgem3(bgem3_path)
-        outputs = self.bgem3.encode(inputs, max_length=512)['dense_vecs']#.tolist()
+        outputs = self.bgem3.encode(inputs, max_length=512)['dense_vecs'] # List[numpy.ndarray[numpy.float16]]
         return outputs
     def cross_encode_text(self,text_a, text_b, rerank_path=None):
         if not rerank_path:
