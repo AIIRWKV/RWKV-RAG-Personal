@@ -94,7 +94,7 @@ class FileStatusManager:
             except:
                 pass
 
-    def add_file(self,file_path,collection_name):
+    def add_file(self,file_path, collection_name):
         with SqliteDB(self.db_path) as db:
             if self.check_file_exists(file_path, collection_name):
                 return 0
@@ -109,11 +109,15 @@ class FileStatusManager:
             result = db.fetchone()
             return result[0] > 0
 
-    def get_collection_files(self, collection_name):
+    def get_collection_files(self, collection_name, page:int=1, page_size:int=100):
+        """
+        获取加入知识库的文件列表
+        """
         with SqliteDB(self.db_path) as db:
-            db.execute(f"select file_path from {status_table_name} where collection_name = ?",(collection_name,))
+            db.execute(f"select file_path, last_updated from {status_table_name} where collection_name = ? limit ？ offset ?",
+                       (collection_name, page_size, page * page_size - page_size))
             result = db.fetchall()
-            return [x[0] for x in result]
+            return result
 
 
     def add_base_model(self,name,path):
@@ -160,6 +164,12 @@ class FileStatusManager:
             db.execute(f"select name from base_model_status where path = ? and status = 1",(path,))
             result = db.fetchone()
             return result[0] if result else None
+
+    def get_base_model_path_by_name(self,name):
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"select path, status from base_model_status where name = ?",(name,))
+            result = db.fetchone()
+            return result if result else None
 
     def active_base_model(self,name):
         with SqliteDB(self.db_path) as db:

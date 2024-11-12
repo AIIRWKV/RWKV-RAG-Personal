@@ -108,10 +108,10 @@ def knowledgebase_manager(index_service_worker, files_status_manager):
     st.subheader("知识库详情")
     collection_to_detail = st.selectbox("选择知识库:",collection_name_list)
     if st.button('查看') and collection_to_detail:
-        file_list = files_status_manager.get_collection_files(collection_to_detail)
+        file_list = files_status_manager.get_collection_files(collection_to_detail, page=1, page_size=10000)
         if file_list:
             st.write("文件列表:")
-            df = pd.DataFrame({'文件': file_list, })
+            df = pd.DataFrame({'文件': [item[0] for item in file_list], })
             st.dataframe(df, use_container_width=True)
         else:
             st.warning("该知识库下没有找到任何文件。")
@@ -226,8 +226,7 @@ def internet_search(llm_service_worker, index_service_worker, files_status_manag
             # 记录文件入库状态
             if is_success:
                 for path in loader.output_files:
-                    if not files_status_manager.check_file_exists(path, st.session_state.kb_name):
-                        files_status_manager.add_file(path, st.session_state.kb_name)
+                    files_status_manager.add_file(path, st.session_state.kb_name)
 
         elif load_button:
             st.warning("参数不能为空。")
@@ -554,10 +553,6 @@ def main():
         default_knowledge_base_dir = os.path.join(parent_dir, "knowledge_data") # 默认联网知识的存储位置
         if not os.path.exists(default_knowledge_base_dir):
             os.makedirs(default_knowledge_base_dir)
-
-        default_upload_knowledge_base_dir = os.path.join(default_knowledge_base_dir, "upload_knowledge")
-        if not os.path.exists(default_upload_knowledge_base_dir):
-            os.makedirs(default_upload_knowledge_base_dir)
 
         tabs_title = ["模型管理", "知识库管理", "知识入库", "知识问答", "配置管理"]
 
