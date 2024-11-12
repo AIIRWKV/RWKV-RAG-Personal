@@ -3,7 +3,6 @@
 API Service
 """
 import os
-import asyncio
 import re
 from datetime import date
 from typing import List
@@ -29,12 +28,12 @@ if not os.path.exists(default_knowledge_base_dir):
 app = FastAPI()
 
 # 假设前端文件在 "frontend/" 目录下
-app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
-
-
-@app.get("/", response_class=FileResponse)
-async def read_root():
-    return FileResponse(path="frontend/index.html")
+# app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+#
+#
+# @app.get("/", response_class=FileResponse)
+# async def read_root():
+#     return FileResponse(path="frontend/index.html")
 
 @app.get('/api/knowledgebase/list')
 async def get_collection_list():
@@ -109,7 +108,8 @@ async def internet_search(query: str):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     try:
-        filepath, msg = asyncio.run(search_and_notify(query, output_dir, output_filename))
+        msg = await search_on_baike(query, output_dir, output_filename)
+        filepath = os.path.join(output_dir, output_filename)
         if not msg:
             return {'code': 200, 'data': {'file_path': filepath}, 'msg': 'ok'}
         else:

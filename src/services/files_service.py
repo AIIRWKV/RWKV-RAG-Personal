@@ -114,7 +114,7 @@ class FileStatusManager:
         获取加入知识库的文件列表
         """
         with SqliteDB(self.db_path) as db:
-            db.execute(f"select file_path, last_updated from {status_table_name} where collection_name = ? limit ？ offset ?",
+            db.execute(f"select file_path, last_updated from {status_table_name} where collection_name = ? limit ? offset ?",
                        (collection_name, page_size, page * page_size - page_size))
             result = db.fetchall()
             return result

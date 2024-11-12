@@ -11,3 +11,4 @@ PyYAML==6.0.1
 rwkv==0.8.26
 streamlit==1.39.0
 psutil==6.1.0
+fastapi==0.115.4
