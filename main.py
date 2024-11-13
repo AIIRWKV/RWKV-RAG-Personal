@@ -45,22 +45,24 @@ async def get_collection_list():
 
 
 @app.post('/api/knowledgebase/add')
-async def add_collection(name: str):
+async def add_collection(body: dict):
     """
     添加知识库
     """
-    if name:
-        collection_name_rule = r'^[a-zA-Z0-9][a-zA-Z0-9_]{1,31}[a-zA-Z0-9]$'
-        if not re.match(collection_name_rule, name):
-            return {"code": 400, "msg": '知识库名称不合法,长度3-32的英文字符串', "data": {}}
+    name = body.get('name')
+    if not name:
+        return {"code": 400, "msg": '知识库名称不能为空', "data": {}}
+    collection_name_rule = r'^[a-zA-Z0-9][a-zA-Z0-9_]{1,31}[a-zA-Z0-9]$'
+    if not re.match(collection_name_rule, name):
+        return {"code": 400, "msg": '知识库名称不合法,长度3-32的英文字符串', "data": {}}
 
-        if index_service_worker.has_collection({'collection_name': name}):
-            return {"code": 400, "msg": '知识库已存在', "data": {}}
-        try:
-            index_service_worker.create_collection({'collection_name': name})
-        except Exception as e:
-            return {"code": 400, "msg": "创建知识库失败:%s" % str(e), "data": {}}
-        return {"code": 200, "msg": 'ok', "data": {}}
+    if index_service_worker.has_collection({'collection_name': name}):
+        return {"code": 400, "msg": '知识库已存在', "data": {}}
+    try:
+        index_service_worker.create_collection({'collection_name': name})
+    except Exception as e:
+        return {"code": 400, "msg": "创建知识库失败:%s" % str(e), "data": {}}
+    return {"code": 200, "msg": 'ok', "data": {}}
 
 
 @app.get('/api/knowledgebase/delete')
@@ -119,10 +121,14 @@ async def internet_search(query: str):
 
 
 @app.post('/api/knowledgebase/archive_text')
-async def archive_text_knowledgebase(name: str, text: str):
+async def archive_text_knowledgebase(body: dict):
     """
     手动输入知识入库
     """
+    name = body.get('name')
+    text = body.get('text')
+    if not (name and isinstance(text, str) and text and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文本内容不能为空', "data": {}}
     payload_texts = text.split("\n")
     success_num = 0
     failed_num = 0
@@ -152,17 +158,24 @@ async def archive_text_knowledgebase(name: str, text: str):
 
 
 @app.post('/api/knowledgebase/archive_file')
-async def archive_file_knowledgebase(name: str, file_path: str, chunk_size: int=512, chunk_overlap: int=0):
+async def archive_file_knowledgebase(body: dict):
     """
     文件入库
     """
+    name: str = body.get('name')
+    file_path: str = body.get('file_path')
+    chunk_size: int = body.get('chunk_size', 512)
+    chunk_overlap: int = body.get('chunk_overlap', 0)
+
+    if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
+
     if not (isinstance(chunk_size, int) and 100<chunk_size<=1024):
         return {"code": 400, "msg": '分词长度不合法，请输入100-1024的整数', "data": {}}
     max_chunk_overlap = int(chunk_size * 0.1)
     if not (isinstance(chunk_overlap, int) and 0 <= max_chunk_overlap):
         return {"code": 400, "msg": '分词重叠长度不合法，请输入0-%d的整数' % max_chunk_overlap, "data": {}}
 
-    # 加载按钮
     file_path = file_path.strip()
     if not os.path.exists(file_path):
         return {"code": 400, "msg": f'文件{file_path}不存在', "data": {}}
@@ -206,6 +219,8 @@ async def search_nearby(name: str, query: str):
     """
     if not query:
         return {"code": 400, "msg": '请输入检索内容', "data": {}}
+    if not name:
+        return {"code": 400, "msg": '请选择知识库', "data": {}}
     embeddings = llm_service_worker.get_embeddings(
         {'texts': [query], "bgem3_path": project_config.default_embedding_path}) # List[numpy.ndarray[numpy.float16]]
     try:
@@ -216,31 +231,40 @@ async def search_nearby(name: str, query: str):
     return {"code": 200, "msg": 'ok', "data": documents}
 
 
-@app.get('/api/llm/get_embeddings')
-async def get_embeddings(text: str):
+@app.post('/api/llm/get_embeddings')
+async def get_embeddings(body: dict):
     """
     获取embedding
     """
+    text = body.get('text')
+    if not (text and isinstance(text, str)):
+        return {"code": 400, "msg": '文本不能为空',}
     embeddings = llm_service_worker.get_embeddings({'texts':[text], "bgem3_path": project_config.default_embedding_path})
     return {"code": 200, "msg": 'ok', "data": embeddings.tolist()}
 
 
-@app.get('/api/llm/cross_score')
-async def get_cross_scores(atext: str, btext: str):
+@app.post('/api/llm/cross_score')
+async def get_cross_scores(body: dict):
     """
     文本相似度计算
     """
+    atext = body.get("atext")
+    btext = body.get("btext")
+    if not (atext and btext and isinstance(atext, str) and isinstance(btext, str)):
+        return {"code": 400, "msg": '参数不能为空', "data": []}
     cross_scores = llm_service_worker.get_cross_scores({"texts_0": [atext],
                                                         "texts_1": [btext],
                                                         "rerank_path": project_config.default_rerank_path})
     return {"code": 200, "msg": 'ok', "data": cross_scores[0] if cross_scores else None}
 
 
-@app.get('/api/llm/batch_cross_score')
-async def batch_get_cross_scores(atexts: List[str], btexts: List[str]):
+@app.post('/api/llm/batch_cross_score')
+async def batch_get_cross_scores(body: dict):
     """
     文本相似度计算
     """
+    atexts: List[str] = body.get("atexts")
+    btexts: List[str] = body.get("btexts")
     if not atexts or not btexts:
         return {"code": 400, "msg": '参数不能为空', "data": []}
     if not isinstance(atexts, list) or not isinstance(btexts, list):
@@ -253,11 +277,15 @@ async def batch_get_cross_scores(atexts: List[str], btexts: List[str]):
     return {"code": 200, "msg": 'ok', "data": cross_scores}
 
 
-@app.get('/api/llm/generate')
-async def generate(instruction_input: str, best_match: str):
+@app.post('/api/llm/generate')
+async def generate(body: dict):
     """
     LLM 生成答案
     """
+    instruction_input: str = body.get('instruction')
+    best_match: str = body.get('text')
+    if not (instruction_input and best_match and isinstance(instruction_input, str) and isinstance(best_match, str)):
+        return {"code": 400, "msg": '指令和参考文本不能为空', "data": {}}
     cmd = {
         "instruction": instruction_input,
         "input_text": best_match,
@@ -282,11 +310,15 @@ async def current_usage():
     return {"code": 200, "msg": 'ok', "data": {'base_model_name': default_base_model_name,
                                                  'strategy': current_strategy}}
 
-@app.get('/api/llm/reload_base_model')
-async def reload_base_model(model_name: str, strategy: str=None):
+@app.post('/api/llm/reload_base_model')
+async def reload_base_model(body: dict):
     """
     重启模型
     """
+    model_name: str = body.get('model_name')
+    strategy: str = body.get('strategy')
+    if not (model_name and isinstance(model_name, str)):
+        return {"code": 400, "msg": '请输入模型名称', "data": {}}
     base_model_info = files_status_manager.get_base_model_path_by_name(model_name)
     if not base_model_info:
         return {"code": 400, "msg": '模型不存在', "data": {}}
@@ -320,16 +352,18 @@ async def get_base_model_list(just_name: bool=False):
 
 
 @app.post('/api/llm/add_base_model')
-async def add_base_model(model_name: str, model_path: str):
+async def add_base_model(body: dict):
     """
     新增基底模型
     """
-    if not model_name:
+    model_name: str = body.get('model_name')
+    model_path: str = body.get('model_path')
+    if not (model_name and isinstance(model_name, str)):
         return {"code": 400, "msg": '请输入模型名称', "data": {}}
 
     if not 3 <= len(model_name) <= 64:
         return {"code": 400, "msg": '模型名称长度必须在3到64个字符之间', "data": {}}
-    if not model_path:
+    if not (model_path and isinstance(model_path, str)):
         return {"code": 400, "msg": '请输入模型路径', "data": {}}
     if not os.path.exists(model_path):
         return {"code": 400, "msg": '模型路径不存在', "data": {}}
@@ -340,23 +374,26 @@ async def add_base_model(model_name: str, model_path: str):
     return {"code": 200, "msg": 'ok', "data": {}}
 
 @app.post('/api/llm/modify_base_model')
-async def modify_base_model(model_name: str, model_path: str):
+async def modify_base_model(body: dict):
     """
     修改基底模型，只能修改模型路径，不能修改模型名称
     """
-    if not model_name:
+    model_name: str = body.get('model_name')
+    model_path: str = body.get('model_path')
+    if not (model_name and isinstance(model_name, str)):
         return {"code": 400, "msg": '请输入模型名称'}
-    if not model_path:
+    if not (model_path and isinstance(model_path, str)):
         return {"code": 400, "msg": '请输入模型路径'}
     files_status_manager.change_base_model(model_name, model_path)
     return {"code": 200, "msg": 'ok', "data": {}}
 
 
-@app.get('/api/llm/offline_base_model')
-async def offline_base_model(model_name: str):
+@app.post('/api/llm/offline_base_model')
+async def offline_base_model(body: dict):
     """
     下线基底模型
     """
+    model_name: str = body.get('model_name')
     if not model_name:
         return {"code": 400, "msg": '请输入模型名称', "data": {}}
     if model_name == 'default':
@@ -364,11 +401,12 @@ async def offline_base_model(model_name: str):
     files_status_manager.offline_base_model(model_name)
     return {"code": 200, "msg": 'ok', "data": {}}
 
-@app.get('/api/llm/active_base_model')
-async def active_base_model(model_name: str):
+@app.post('/api/llm/active_base_model')
+async def active_base_model(body: dict):
     """
     上线基底模型
     """
+    model_name: str = body.get('model_name')
     if not model_name:
        return {"code": 400, "msg": '请输入模型名称', "data": {}}
     files_status_manager.active_base_model(model_name)
@@ -376,35 +414,47 @@ async def active_base_model(model_name: str):
 
 
 @app.post('/api/config/modify')
-async def modify_config(model_path: str, embedding_path: str, reranker_path: str, knowledge_base_path: str,
-                                  vectordb_path: str, vectordb_port: str, vectordb_name: str):
+async def modify_config(body: dict):
     """
     修改配置文件, 修改配置文件后需要重启服务才能生效
     """
+    model_path: str = body.get('model_path')
+    embedding_path: str = body.get('embedding_path')
+    reranker_path: str = body.get('reranker_path')
+    new_knowledge_base_path: str = body.get('knowledge_base_path')
+    vectordb_path: str = body.get('vectordb_path')
+    vectordb_port: str = body.get('vectordb_port')
+    vectordb_name: str = body.get('vectordb_name')
+
     if model_path and not os.path.exists(model_path):
         return {"code": 400, "msg": '基底模型路径不存在', "data": {}}
-    if embedding_path and not os.path.exists(embedding_path):
-        return {"code": 400, "msg": 'Embedding模型路径不存在', "data": {}}
-    if not os.path.isdir(embedding_path):
-        return {"code": 400, "msg": 'Embedding模型路径必须是目录', "data": {}}
-    if reranker_path and not os.path.exists(reranker_path):
-        return {"code": 400, "msg": 'Reranker模型路径不存在', "data": {}}
-    if not os.path.isdir(reranker_path):
-        return {"code": 400, "msg": 'Reranker模型路径必须是目录', "data": {}}
-    if knowledge_base_path and not os.path.exists(knowledge_base_path):
-        return {"code": 400, "msg": '知识库文件存储目录不存在', "data": {}}
-    if not os.path.isdir(knowledge_base_path):
-        return {"code": 400, "msg": '知识库文件存储目录必须是目录', "data": {}}
-    if not ((isinstance(vectordb_port, str) and vectordb_port.isdigit()) or isinstance(vectordb_port, int)):
-        return {"code": 400, "msg": 'vectordb_port 必须是数字', "data": {}}
+    if embedding_path:
+        if not os.path.exists(embedding_path):
+            return {"code": 400, "msg": 'Embedding模型路径不存在', "data": {}}
+        if not os.path.isdir(embedding_path):
+            return {"code": 400, "msg": 'Embedding模型路径必须是目录', "data": {}}
+    if reranker_path:
+        if not os.path.exists(reranker_path):
+            return {"code": 400, "msg": 'Reranker模型路径不存在', "data": {}}
+        if not os.path.isdir(reranker_path):
+            return {"code": 400, "msg": 'Reranker模型路径必须是目录', "data": {}}
+    if new_knowledge_base_path:
+        if not os.path.exists(new_knowledge_base_path):
+            return {"code": 400, "msg": '知识库文件存储目录不存在', "data": {}}
+        if not os.path.isdir(new_knowledge_base_path):
+            return {"code": 400, "msg": '知识库文件存储目录必须是目录', "data": {}}
+    if vectordb_port:
+        if not ((isinstance(vectordb_port, str) and vectordb_port.isdigit()) or isinstance(vectordb_port, int)):
+            return {"code": 400, "msg": 'vectordb_port 必须是数字', "data": {}}
     if project_config.config.get('is_init') is True:
-        project_config.set_config(model_path, embedding_path, reranker_path, knowledge_base_path,
+        project_config.set_config(model_path, embedding_path, reranker_path, new_knowledge_base_path,
                               vectordb_path, vectordb_port)
     else:
-        project_config.set_config(model_path, embedding_path, reranker_path, knowledge_base_path,
+        project_config.set_config(model_path, embedding_path, reranker_path, new_knowledge_base_path,
                                   vectordb_path, vectordb_port, vectordb_name=vectordb_name)
 
     return {"code": 200, "msg": 'ok', "data": {}}
+
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=8080)

@@ -1,6 +1,8 @@
 ﻿# coding=utf-8
+import hashlib
 import random
 import string
+from typing import Union
 
 
 def quote_filename(name: str):
@@ -31,3 +33,14 @@ def get_random_string(length):
     """
     haracters = string.ascii_uppercase + string.digits
     return ''.join(random.choices(haracters, k=length))
+
+
+def calculate_string_md5(text: Union[str, bytes]):
+    """
+    计算字符串的md5值
+    """
+    if isinstance(text, str):
+        text = text.encode('utf-8')
+    md5_hash = hashlib.md5()
+    md5_hash.update(text)
+    return md5_hash.hexdigest()

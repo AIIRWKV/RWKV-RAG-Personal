@@ -4,7 +4,6 @@ Milvus Lite
 支持Linux 非docker部署方式   Ubuntu >= 20.04（x86_64 和 arm64）
 """
 import os.path
-import uuid
 import itertools
 from abc import ABC
 
@@ -13,6 +12,7 @@ from websockets.http11 import MAX_LINE_LENGTH
 from src.vectordb import VECTOR_DB_DIMENSION
 from src.vectordb import RECALL_NUMBER
 from src.vectordb import AbstractVectorDBManager
+from src.utils.tools import calculate_string_md5
 from .errors import VectorDBCollectionNotExistError, VectorDBError, VectorDBCollectionExistError
 
 
@@ -75,7 +75,7 @@ class MilvusLiteManager(AbstractVectorDBManager, ABC):
         embeddings = kwargs.get('embeddings')
 
         if keys is None or isinstance(keys, list) is False or len(keys) != len(values):
-            keys = [str(uuid.uuid4()) for i in range(len(values))]
+            keys = [calculate_string_md5(value) for value in values]
         client = self.client()
         new_embeddings = [self.padding_vectors(eb) for eb in embeddings]
         # TODO 有一个subject参数，可以加快向量查询速度， 在产品设计上，是否也可以加该字段

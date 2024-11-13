@@ -2,7 +2,6 @@
 """
 Windows  Linux都支持
 """
-import uuid
 import subprocess
 from abc import ABC
 from datetime import datetime
@@ -11,6 +10,7 @@ import psutil
 
 from src.vectordb import RECALL_NUMBER
 from src.vectordb import AbstractVectorDBManager
+from src.utils.tools import calculate_string_md5
 from .errors import VectorDBCollectionNotExistError, VectorDBError
 
 
@@ -77,7 +77,7 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         embeddings = kwargs.get('embeddings')
 
         if keys is None or isinstance(keys, list) is False or len(keys) != len(values):
-            keys = [str(uuid.uuid4()) for i in range(len(values))]
+            keys = [calculate_string_md5(value) for value in values]
         client = self.client()
         new_embeddings = [eb for eb in embeddings] # TODO 这一步是多余的吗
         try:
