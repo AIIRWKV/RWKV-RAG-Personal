@@ -8,33 +8,14 @@ TEXT_DELIMITER = {'\n','!','?',';','。','；','！','？'}  # 默认一句话�
 
 class AbstractLoader(ABC):
 
-    def __init__(self, file_path: str, chunk_size:int=TEXT_CHUNK_SIZE, delimiter=None):
+    def __init__(self, file_path: str, chunk_size:int=TEXT_CHUNK_SIZE, delimiter=None, is_filepath: bool=True):
         if delimiter is None:
             delimiter = TEXT_DELIMITER
         self.file_path = file_path
         self.chunk_size = chunk_size
         self.delimiter = delimiter
+        self.is_filepath = is_filepath
 
     @abstractmethod
     def load(self):
         pass
-
-
-if __name__ == '__main__':
-    import re
-
-    delimiter = "\n!?;。；！？"
-    dels = []
-    s = 0
-    for m in re.finditer(r"`([^`]+)`", delimiter, re.I):
-        f, t = m.span()
-        print(f, t)
-        dels.append(m.group(1))
-        dels.extend(list(delimiter[s: f]))
-        s = t
-    if s < len(delimiter):
-        dels.extend(list(delimiter[s:]))
-    dels = [re.escape(d) for d in delimiter if d]
-    dels = [d for d in dels if d]
-    dels = "|".join(dels)
-    print(dels)

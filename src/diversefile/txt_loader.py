@@ -1,5 +1,4 @@
 ﻿# coding=utf-8
-import re
 
 from src.diversefile.abc import AbstractLoader
 
