@@ -23,6 +23,12 @@ create_using_base_model_table_sql = ("create table if not exists base_model_usin
                                      "(id INTEGER PRIMARY KEY AUTOINCREMENT,"
                                      "name text NOT NULL)")
 
+create_search_history_table_sql = ("create table if not exists search_history "
+                           "(collection_name text NOT NULL, "
+                           "query text NOT NULL, "
+                           "create_time text NULL, "
+                           " primary key(collection_name, query))")
+
 
 valid_status = ['unprocess', 'waitinglist','processing','processed','failed']
 
@@ -127,6 +133,20 @@ class FileStatusManager:
                 db.execute(f"select file_path, last_updated, status from {status_table_name} where collection_name = ? and file_path like ? limit ? offset ?",
                        (collection_name, '%'+keyword+'%', page_size, page * page_size - page_size))
             result = db.fetchall()
+            return result
+
+    def get_collection_files_count(self, collection_name, keyword:str=None):
+        """
+        获取加入知识库的文件列表
+        """
+        with SqliteDB(self.db_path) as db:
+            if not keyword:
+                db.execute(f"select count(1) from {status_table_name} where collection_name = ? ",
+                       (collection_name,))
+            else:
+                db.execute(f"select count(1) from {status_table_name} where collection_name = ? and file_path like ? ?",
+                       (collection_name, '%'+keyword+'%'))
+            result = db.fetchone()
             return result
 
     def collection_files_count(self):
