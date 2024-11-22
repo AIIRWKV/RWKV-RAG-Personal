@@ -183,7 +183,7 @@ class Loader:
                 with open(output_file, 'w', encoding='utf-8') as f:
                     for item in func(path, split_type=split_type, lang=lang):
                         if item:
-                            yield item
+                            yield (item, output_file)
                             f.write(item)
                             f.write('\n')
 

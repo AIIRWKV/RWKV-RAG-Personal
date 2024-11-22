@@ -1,6 +1,4 @@
 ﻿# coding=utf-8
-import re
-
 from markdown import markdown
 
 from src.diversefile.abc import AbstractLoader, HtmlCommonLoader

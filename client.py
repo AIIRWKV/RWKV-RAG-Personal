@@ -213,7 +213,7 @@ def internet_search(llm_service_worker, index_service_worker, files_status_manag
                 chunks= loader.load_and_split_file(output_path)
 
                 for idx,chunk in enumerate(chunks):
-                    tmp = [chunk]
+                    tmp = [chunk[0]]
                     embeddings = llm_service_worker.get_embeddings({'texts': tmp, "bgem3_path": project_config.default_embedding_path})
                     try:
                         index_service_worker.index_texts({"keys": None, "texts": tmp, "embeddings": embeddings,

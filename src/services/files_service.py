@@ -24,7 +24,7 @@ create_using_base_model_table_sql = ("create table if not exists base_model_usin
                                      "name text NOT NULL)")
 
 
-valid_status = ['waitinglist','processing','processed','failed']
+valid_status = ['unprocess', 'waitinglist','processing','processed','failed']
 
 
 class SqliteDB:
@@ -94,12 +94,12 @@ class FileStatusManager:
             except:
                 pass
 
-    def add_file(self,file_path, collection_name):
+    def add_file(self,file_path, collection_name, status='processed'):
         with SqliteDB(self.db_path) as db:
             if self.check_file_exists(file_path, collection_name):
                 return 0
             db.execute(f"insert into {status_table_name} (file_path,collection_name,status,last_updated)"
-                       f" values (?,?,?,datetime('now'))",(file_path,collection_name,'processed'))
+                       f" values (?,?,?,datetime('now'))",(file_path,collection_name,status))
         return 1
 
     def check_file_exists(self,file_path, collection_name):
@@ -109,13 +109,29 @@ class FileStatusManager:
             result = db.fetchone()
             return result[0] > 0
 
-    def get_collection_files(self, collection_name, page:int=1, page_size:int=100):
+    def update_file_status(self,file_path, collection_name, status):
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"update {status_table_name} set status = ?,last_updated = datetime('now') where collection_name = ? "
+                           f"and file_path = ?",(status,collection_name,file_path))
+            return db.rowcount
+
+    def get_collection_files(self, collection_name, page:int=1, page_size:int=100, keyword:str=None):
         """
         获取加入知识库的文件列表
         """
         with SqliteDB(self.db_path) as db:
-            db.execute(f"select file_path, last_updated from {status_table_name} where collection_name = ? limit ? offset ?",
+            if not keyword:
+                db.execute(f"select file_path, last_updated, status from {status_table_name} where collection_name = ? limit ? offset ?",
                        (collection_name, page_size, page * page_size - page_size))
+            else:
+                db.execute(f"select file_path, last_updated, status from {status_table_name} where collection_name = ? and file_path like ? limit ? offset ?",
+                       (collection_name, '%'+keyword+'%', page_size, page * page_size - page_size))
+            result = db.fetchall()
+            return result
+
+    def collection_files_count(self):
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"select collection_name,count(1) AS total from {status_table_name} group by collection_name")
             result = db.fetchall()
             return result
 

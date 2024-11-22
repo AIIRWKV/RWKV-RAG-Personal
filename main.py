@@ -4,6 +4,7 @@ API Service
 """
 import os
 import re
+from collections import defaultdict
 from datetime import date
 from typing import List
 
@@ -36,12 +37,19 @@ app = FastAPI()
 #     return FileResponse(path="frontend/index.html")
 
 @app.get('/api/knowledgebase/list')
-async def get_collection_list():
+async def get_collection_list(keyword: str=None, need_count: bool=False):
     """
     获取知识库列表
     """
     collection_list = index_service_worker.show_collections({})
-    return {'code': 200, 'data': [{'name': i[0], 'meta': i[1]} for i in collection_list], 'msg': 'ok'}
+    if need_count:
+        collection_counts = files_status_manager.collection_files_count()
+        collection_counts_dict = {i[0]: i[1] for i in collection_counts}
+    else:
+        collection_counts_dict = {}
+    if keyword:
+        return {'code': 200, 'data': [{'name': i[0], 'meta': i[1], 'count': collection_counts_dict.get(i[0], 0)} for i in collection_list if keyword in i[0]], 'msg': 'ok'}
+    return {'code': 200, 'data': [{'name': i[0], 'meta': i[1], 'count': collection_counts_dict.get(i[0], 0)} for i in collection_list], 'msg': 'ok'}
 
 
 @app.post('/api/knowledgebase/add')
@@ -80,13 +88,13 @@ async def delete_collection(name: str):
 
 
 @app.get('/api/knowledgebase/file_list')
-async def get_collection_file_list(name: str, page: int=1, page_size: int=100):
+async def get_collection_file_list(name: str, page: int=1, page_size: int=100, keyword: str=None):
     """
     获取知识库下所有知识文件列表
     """
-    file_list = files_status_manager.get_collection_files(name, page=page, page_size=page_size)
+    file_list = files_status_manager.get_collection_files(name, page=page, page_size=page_size, keyword=keyword)
     if file_list:
-        result = [{'file_path': item[0], 'create_time': item[1]} for item in file_list]
+        result = [{'file_path': item[0], 'create_time': item[1], 'status': item[2] if item[2] else 'processed'} for item in file_list]
     else:
         result = []
     return {"code": 200, "msg": 'ok', "data": result}
@@ -127,12 +135,18 @@ async def archive_text_knowledgebase(body: dict):
     """
     name = body.get('name')
     text = body.get('text')
+    file_name = body.get('file_name')
     if not (name and isinstance(text, str) and text and isinstance(name, str)):
         return {"code": 400, "msg": '知识库名称和文本内容不能为空', "data": {}}
     payload_texts = text.split("\n")
     success_num = 0
     failed_num = 0
-    output_filename = 'manual_input_%s.txt' % get_random_string(6)
+    if not file_name:
+        output_filename = 'manual_input_%s.txt' % get_random_string(6)
+    else:
+        if not isinstance(file_name, str):
+            return {"code": 400, "msg": '文件名必须是字符串', "data": {}}
+        output_filename = '%s_%s.txt' % (file_name, get_random_string(6))
     date_str = date.today().strftime("%Y%m%d")
     output_dir = os.path.join(default_knowledge_base_dir, date_str)
     if not os.path.exists(output_dir):
@@ -152,7 +166,10 @@ async def archive_text_knowledgebase(body: dict):
                 continue
             wf.write(chunk)
             wf.write('\n')
-    files_status_manager.add_file(output_file, name)
+    if failed_num > 1.5 * success_num:
+         files_status_manager.add_file(output_file, name, 'failed')
+    else:
+        files_status_manager.add_file(output_file, name)
     return {"code": 200, "msg": 'ok', "data": {'success_num': success_num, 'failed_num': failed_num,
                                                'file_path': output_file}}
 
@@ -193,20 +210,26 @@ async def archive_file_knowledgebase(body: dict):
     chunks = loader.load_and_split_file(output_dir)
     success_num = 0
     failed_num = 0
+    path_insert_status = defaultdict(lambda :{'success_num':0, 'failed_num':0})
     for idx, chunk in enumerate(chunks):
-        tmp = [chunk]
+        tmp = [chunk[0]]
         embeddings = llm_service_worker.get_embeddings(
             {'texts': tmp, "bgem3_path": project_config.default_embedding_path})
         try:
             index_service_worker.index_texts({"keys": None, "texts": tmp, "embeddings": embeddings,
                                               'collection_name': name})
             success_num += 1
+            path_insert_status[chunk[1]]['success_num'] += 1
         except Exception as e:
             failed_num += 1
+            path_insert_status[chunk[1]]['failed_num'] += 1
 
     # 记录文件入库状态
     for path in loader.output_files:
-        files_status_manager.add_file(path,name)
+        if path_insert_status[path]['failed_num'] > 1.5 * path_insert_status[path]['success_num']:
+            files_status_manager.add_file(path,name, 'failed')
+        else:
+            files_status_manager.add_file(path, name)
     return {"code": 200, "msg": 'ok', "data": {'success_num': success_num, 'failed_num': failed_num,
                                                'file_path': loader.output_files[:500]}}
 
