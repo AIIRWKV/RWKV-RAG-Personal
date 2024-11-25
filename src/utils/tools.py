@@ -2,7 +2,7 @@
 import hashlib
 import random
 import string
-from typing import Union
+from typing import Union, List
 
 
 def quote_filename(name: str):
@@ -44,3 +44,21 @@ def calculate_string_md5(text: Union[str, bytes]):
     md5_hash = hashlib.md5()
     md5_hash.update(text)
     return md5_hash.hexdigest()
+
+
+def number_list_max(nums:List[Union[int, float]]):
+    """
+    返回一个列表中最大的数字，如果列表为空，返回0
+    """
+    max_value = float('-inf')
+    max_index = 0
+    index = -1
+    for value in nums:
+        index += 1
+        if value > max_value:
+            max_value = value
+            max_index = index
+    return max_value, max_index
+
+if __name__ == '__main__':
+    print(number_list_max([-1.1, -1.11, 0]))

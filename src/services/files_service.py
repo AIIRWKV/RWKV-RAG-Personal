@@ -179,7 +179,7 @@ class FileStatusManager:
                        (collection_name, query))
             result = db.fetchone()
             return result[0]
-    def add_search_history(self, collection_name: str, query: str, recall_result: List[str]):
+    def add_search_history(self, collection_name: str, query: str, recall_result: List[str], match_best: str):
         """
         添加召回信息
         :return:
@@ -190,7 +190,7 @@ class FileStatusManager:
         with SqliteDB(self.db_path) as db:
             db.execute(f'insert into search_history (collection_name,query,recall_msg,match_best,create_time)'
                            f' values (?,?,?,?,datetime("now"))',
-                           (collection_name, query, json.dumps(recall_result, ensure_ascii=False), ''))
+                           (collection_name, query, json.dumps(recall_result, ensure_ascii=False), match_best))
             db.execute(f'select id from search_history where collection_name = ? and query = ? ',
                        (collection_name, query))
             new_id = db.fetchone()[0]
@@ -203,20 +203,6 @@ class FileStatusManager:
             with SqliteDB(self.db_path) as db:
                 db.execute(f'delete from search_history where id = ?', (history_id,))
                 db.execute(f'delete from chat_history_{table_id} where search_id = ?', (history_id,))
-
-    def update_search_history_match_best(self, collection_name: str=None, query:str=None,
-                                         search_id:int=None, match_best:str=None):
-        if not match_best:
-            return 0
-        with SqliteDB(self.db_path) as db:
-            if search_id:
-                db.execute(f'update search_history set match_best = ? where id = ?', (match_best, search_id))
-                return 1
-            if collection_name and query:
-                db.execute(f'update search_history set match_best = ? where collection_name = ? and query = ?',
-                           (match_best, collection_name, query))
-                return 1
-        return 0
 
     def get_collection_search_history(self, collection_name: str, limit: int=1000):
         with SqliteDB(self.db_path) as db:
