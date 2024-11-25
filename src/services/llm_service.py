@@ -167,7 +167,6 @@ class LLMService:
             ctx = f'Instruction: {instruction}\nInput: {input_text}\n\nResponse:'
         else:
             ctx = template_prompt
-        print(ctx)
         try:
             pipeline = PIPELINE(self.model, "rwkv_vocab_v20230424")
             output = pipeline.generate(ctx, token_count=1200, args=gen_args, state=states_value)

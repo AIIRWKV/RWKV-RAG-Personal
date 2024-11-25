@@ -1,6 +1,7 @@
 import threading
+import json
 import traceback
-
+from typing import List
 import sqlite3
 
 
@@ -24,10 +25,19 @@ create_using_base_model_table_sql = ("create table if not exists base_model_usin
                                      "name text NOT NULL)")
 
 create_search_history_table_sql = ("create table if not exists search_history "
-                           "(collection_name text NOT NULL, "
+                           "(id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                            "collection_name text NOT NULL, "
                            "query text NOT NULL, "
+                            "recall_msg text,"
+                           "match_best text,"
                            "create_time text NULL, "
-                           " primary key(collection_name, query))")
+                           " UNIQUE (collection_name, query))")
+
+create_chat_history_table_sql_list = ['create table if not exists chat_history_0 (id INTEGER PRIMARY KEY AUTOINCREMENT,search_id INTEGER NOT NULL, chat text not null, create_time text NULL)',
+                                      'create table if not exists chat_history_1 (id INTEGER PRIMARY KEY AUTOINCREMENT,search_id INTEGER NOT NULL, chat text not null, create_time text NULL)',
+                                      'create table if not exists chat_history_2 (id INTEGER PRIMARY KEY AUTOINCREMENT,search_id INTEGER NOT NULL, chat text not null, create_time text NULL)',
+                                      'create table if not exists chat_history_3 (id INTEGER PRIMARY KEY AUTOINCREMENT,search_id INTEGER NOT NULL, chat text not null, create_time text NULL)',
+                                      'create table if not exists chat_history_4 (id INTEGER PRIMARY KEY AUTOINCREMENT,search_id INTEGER NOT NULL, chat text not null, create_time text NULL)']
 
 
 valid_status = ['unprocess', 'waitinglist','processing','processed','failed']
@@ -82,6 +92,9 @@ class FileStatusManager:
             db.execute(create_status_table_sql)
             db.execute(create_base_model_table_sql)
             db.execute(create_using_base_model_table_sql)
+            db.execute(create_search_history_table_sql)
+            for sql in create_chat_history_table_sql_list:
+                db.execute(sql)
             try:
                 # 将配置文件的基底模型添加到管理界面
                 db_base_model = self.get_using_base_model()
@@ -147,11 +160,93 @@ class FileStatusManager:
                 db.execute(f"select count(1) from {status_table_name} where collection_name = ? and file_path like ? ?",
                        (collection_name, '%'+keyword+'%'))
             result = db.fetchone()
-            return result
+            return result[0]
 
     def collection_files_count(self):
         with SqliteDB(self.db_path) as db:
             db.execute(f"select collection_name,count(1) AS total from {status_table_name} group by collection_name")
+            result = db.fetchall()
+            return result
+
+
+    def check_search_history_exist(self, collection_name: str, query: str):
+        """
+        检查是否已经召回过
+        :return:
+        """
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"select count(1) from search_history where collection_name = ? and query = ?",
+                       (collection_name, query))
+            result = db.fetchone()
+            return result[0]
+    def add_search_history(self, collection_name: str, query: str, recall_result: List[str]):
+        """
+        添加召回信息
+        :return:
+        """
+        new_id = self.check_search_history_exist(collection_name, query)
+        if new_id > 0:
+            return new_id
+        with SqliteDB(self.db_path) as db:
+            db.execute(f'insert into search_history (collection_name,query,recall_msg,match_best,create_time)'
+                           f' values (?,?,?,?,datetime("now"))',
+                           (collection_name, query, json.dumps(recall_result, ensure_ascii=False), ''))
+            db.execute(f'select id from search_history where collection_name = ? and query = ? ',
+                       (collection_name, query))
+            new_id = db.fetchone()[0]
+            return new_id
+
+    def delete_search_history(self, collection_name:str, query: str):
+        history_id = self.check_search_history_exist(collection_name, query)
+        if history_id > 0:
+            table_id = history_id % 5
+            with SqliteDB(self.db_path) as db:
+                db.execute(f'delete from search_history where id = ?', (history_id,))
+                db.execute(f'delete from chat_history_{table_id} where search_id = ?', (history_id,))
+
+    def update_search_history_match_best(self, collection_name: str=None, query:str=None,
+                                         search_id:int=None, match_best:str=None):
+        if not match_best:
+            return 0
+        with SqliteDB(self.db_path) as db:
+            if search_id:
+                db.execute(f'update search_history set match_best = ? where id = ?', (match_best, search_id))
+                return 1
+            if collection_name and query:
+                db.execute(f'update search_history set match_best = ? where collection_name = ? and query = ?',
+                           (match_best, collection_name, query))
+                return 1
+        return 0
+
+    def get_collection_search_history(self, collection_name: str, limit: int=1000):
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"select id,collection_name,query,create_time from search_history where collection_name = ? limit ? ",
+                       (collection_name, limit))
+            result = db.fetchall()
+            return result
+
+    def get_collection_search_history_info(self, search_id:int):
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"select id,collection_name,query,recall_msg,match_best,create_time from search_history where id = ?",
+                       (search_id,))
+            result = db.fetchone()
+            return result
+
+    def add_chat(self, search_id: int, chat_text: str):
+        """
+        :param search_id:
+        :param chat_text: [{"role":"user","content":instruct}, {"role":"assistant","content":response}]
+        :return:
+        """
+        if search_id > 0:
+            with SqliteDB(self.db_path) as db:
+                db.execute(f'insert into chat_history_{search_id % 5} (search_id,chat,create_time)'
+                       f' values (?,?,datetime("now"))',(search_id,chat_text))
+
+    def get_chat_list(self, search_id: int, page: int=1, page_size: int=100):
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"select id,chat from chat_history_{search_id % 5} where search_id = ? order by id DESC limit ? offset ? ",
+                       (search_id, page_size, (page - 1) * page_size))
             result = db.fetchall()
             return result
 

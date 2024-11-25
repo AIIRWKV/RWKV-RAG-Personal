@@ -2,10 +2,11 @@
 """
 API Service
 """
+import json
 import os
 import re
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from typing import List
 
 import uvicorn
@@ -98,6 +99,15 @@ async def get_collection_file_list(name: str, page: int=1, page_size: int=100, k
     else:
         result = []
     return {"code": 200, "msg": 'ok', "data": result}
+
+
+@app.get('/api/knowledgebase/file_list_count')
+async def get_collection_file_list_count(name: str, keyword: str=None):
+    """
+    获取知识库下所有知识文件数量
+    """
+    count = files_status_manager.get_collection_files_count(name, keyword=keyword)
+    return {"code": 200, "msg": 'ok', "data": count}
 
 
 async def search_and_notify(search_query, output_dir, output_filename):
@@ -236,10 +246,12 @@ async def archive_file_knowledgebase(body: dict):
 
 
 @app.get('/api/knowledgebase/recall')
-async def search_nearby(name: str, query: str):
+async def search_nearby(name: str, query: str, is_new:bool = False):
     """
     知识检索召回
     """
+    query = query.strip()
+    name = name.strip()
     if not query:
         return {"code": 400, "msg": '请输入检索内容', "data": {}}
     if not name:
@@ -251,7 +263,88 @@ async def search_nearby(name: str, query: str):
             {'collection_name': name, "embeddings": embeddings})
     except Exception as e:
        return {"code": 400, "msg": "召回数据失败:%s" % str(e), "data": {}}
-    return {"code": 200, "msg": 'ok', "data": documents}
+
+    if is_new:
+        # 重新召回删除所有的记录
+        files_status_manager.delete_search_history(name, query)
+
+    if documents:
+        search_id = files_status_manager.add_search_history(name, query, documents,)
+    else:
+        search_id = -1
+
+    return {"code": 200, "msg": 'ok', "data": {'documents': documents, 'search_id': search_id}}
+
+
+@app.post('/api/knowledgebase/recall/update_match_best')
+async def update_recall_match_best(body: dict):
+    """
+    更新最佳匹配内容
+    :param body:
+    :return:
+    """
+    name: str = body.get('name') or ''
+    query: str = body.get('query') or ''
+    search_id: int = body.get('search_id')
+    match_best: str = body.get('match_best')
+    files_status_manager.update_search_history_match_best(name, query, search_id, match_best)
+    return {"code": 200, "msg": 'ok', "data": {}}
+
+@app.post('/api/knowledgebase/search_history_delete')
+async def search_history_delete(body: dict):
+    """
+    删除检索历史
+    """
+    name: str = body.get('name') or ''
+    query: str = body.get('query') or ''
+    name = name.strip()
+    query = query.strip()
+    if name and query:
+        files_status_manager.delete_search_history(name, query)
+        return {"code": 200, "msg": 'ok', "data": {}}
+    else:
+        return {"code": 400, "msg": '知识库名称和检索内容不能为空', "data": {}}
+
+@app.get('/api/knowledgebase/search_history_list')
+async def knowledge_search_history(name: str):
+    """
+    获取检索历史
+    """
+    data = files_status_manager.get_collection_search_history(name)
+    result = [{'search_id': line[0], 'collection_name': line[1], 'query': line[2], 'create_time': line[3] } for line in data]
+    return {"code": 200, "msg": 'ok', "data": result}
+
+
+@app.get('/api/knowledgebase/history_chat_list')
+async def knowledge_history_chat_list(search_id: int = None, page:int=1, page_size:int=20):
+    """
+    获取检索历史详情
+    """
+    lines = files_status_manager.get_chat_list(search_id, page, page_size)
+    data = []
+    for line in reversed(lines):
+        try:
+            chat = json.loads(line[1])
+        except:
+            continue
+        data.append({'chat_id': line[0], 'chat': chat})
+    return {"code": 200, "msg": 'ok', "data": data}
+
+
+@app.get('/api/knowledgebase/search_history_detail')
+async def knowledge_search_history_detail(search_id: int):
+    """
+    获取检索历史详情
+    """
+    item = files_status_manager.get_collection_search_history_info(search_id)
+    if not item:
+        return {"code": 400, "msg": '检索历史不存在', "data": {}}
+    try:
+        tmp = json.loads(item[3])
+    except:
+        tmp = item[3]
+    return {"code": 200, "msg": 'ok', "data": {'search_id': item[0], 'collection_name': item[1], 'query': item[2],
+                                               'recall_msg': tmp, 'match_best': item[4], 'create_time': item[5]}}
 
 
 @app.post('/api/llm/get_embeddings')
@@ -306,7 +399,9 @@ async def generate(body: dict):
     LLM 生成答案
     """
     instruction_input: str = body.get('instruction')
+    time1 = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     best_match: str = body.get('text')
+    search_id :int = body.get('search_id', 0)
     if not (instruction_input and best_match and isinstance(instruction_input, str) and isinstance(best_match, str)):
         return {"code": 400, "msg": '指令和参考文本不能为空', "data": {}}
     cmd = {
@@ -318,6 +413,12 @@ async def generate(body: dict):
 
     }
     sampling_results = llm_service_worker.sampling_generate(cmd)
+    if isinstance(search_id, int):
+        time2 = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        chat_text = json.dumps([{"role":"user","content":instruction_input, 'time': time1},
+                                {"role":"assistant","content":sampling_results, 'time': time2}],
+                               ensure_ascii=False)
+        files_status_manager.add_chat(search_id, chat_text)
     return {"code": 200, "msg": 'ok', "data": sampling_results}
 
 
