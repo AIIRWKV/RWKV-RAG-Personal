@@ -131,7 +131,9 @@ async def internet_search(query: str):
         msg = await search_on_baike(query, output_dir, output_filename)
         filepath = os.path.join(output_dir, output_filename)
         if not msg:
-            return {'code': 200, 'data': {'file_path': filepath}, 'msg': 'ok'}
+            with open(filepath, 'r', encoding='utf-8') as f:
+                txt = f.read()
+            return {'code': 200, 'data': {'file_path': filepath, 'text': txt}, 'msg': 'ok'}
         else:
             return {'code': 400, 'data': {}, 'msg': msg}
     except Exception as e:
