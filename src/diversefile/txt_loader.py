@@ -1,6 +1,6 @@
 ﻿# coding=utf-8
 
-from src.diversefile.abc import AbstractLoader
+from src.diversefile import AbstractLoader
 
 class TxtLoader(AbstractLoader):
 

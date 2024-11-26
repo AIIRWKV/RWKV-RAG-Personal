@@ -1,6 +1,6 @@
 ﻿# coding=utf-8
 
-from src.diversefile.abc import HtmlCommonLoader
+from src.diversefile import HtmlCommonLoader
 
 class HtmlLoader(HtmlCommonLoader):
     pass

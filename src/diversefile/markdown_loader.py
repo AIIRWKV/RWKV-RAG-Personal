@@ -1,7 +1,7 @@
 ﻿# coding=utf-8
 from markdown import markdown
 
-from src.diversefile.abc import AbstractLoader, HtmlCommonLoader
+from src.diversefile import AbstractLoader, HtmlCommonLoader
 
 class MarkdownLoader(AbstractLoader):
 
@@ -16,3 +16,4 @@ class MarkdownLoader(AbstractLoader):
         lines = HtmlCommonLoader(html_str, is_filepath=False).load()
         for line in lines:
             yield line
+        del html_str

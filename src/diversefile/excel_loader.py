@@ -2,7 +2,7 @@
 
 from openpyxl import load_workbook
 
-from src.diversefile.abc import AbstractLoader
+from src.diversefile import AbstractLoader
 
 class ExcelLoader(AbstractLoader):
     """
@@ -30,3 +30,4 @@ class ExcelLoader(AbstractLoader):
                 if sheet_name.lower().find("sheet") < 0:
                     l += " ——" + sheet_name
                 yield l
+        wb.close()

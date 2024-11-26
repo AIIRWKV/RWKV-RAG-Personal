@@ -3,7 +3,7 @@ import re
 
 from docx import Document
 
-from src.diversefile.abc import AbstractLoader
+from src.diversefile import AbstractLoader
 
 
 
@@ -26,4 +26,6 @@ class DocxLoader(AbstractLoader):
                 yield current_txt
                 current_txt = ''
             current_txt += ' ' + line
-
+        if current_txt:
+            yield current_txt
+        del doc
