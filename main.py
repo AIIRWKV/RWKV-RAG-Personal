@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse
 
 from src.utils.loader import Loader
 from src.utils.internet import search_on_baike
-from src.utils.tools import quote_filename, get_random_string
+from src.utils.tools import quote_filename, get_random_string, number_list_max
 from configuration import config as project_config
 from src.services import index_service_worker, llm_service_worker, files_status_manager
 
@@ -271,26 +271,16 @@ async def search_nearby(name: str, query: str, is_new:bool = False):
         files_status_manager.delete_search_history(name, query)
 
     if documents:
-        search_id = files_status_manager.add_search_history(name, query, documents,)
+        # 计算最佳匹配值
+        cross_scores = llm_service_worker.get_cross_scores({"texts_0": documents,
+                                                            "texts_1": [query for i in documents],
+                                                            "rerank_path": project_config.default_rerank_path})
+        max_value, max_index = number_list_max(cross_scores)
+        search_id = files_status_manager.add_search_history(name, query, documents, documents[max_index])
     else:
-        search_id = -1
+       return {"code": 400, "msg": '相关问题找回失败，换一个问题试试！', }
 
-    return {"code": 200, "msg": 'ok', "data": {'documents': documents, 'search_id': search_id}}
-
-
-@app.post('/api/knowledgebase/recall/update_match_best')
-async def update_recall_match_best(body: dict):
-    """
-    更新最佳匹配内容
-    :param body:
-    :return:
-    """
-    name: str = body.get('name') or ''
-    query: str = body.get('query') or ''
-    search_id: int = body.get('search_id')
-    match_best: str = body.get('match_best')
-    files_status_manager.update_search_history_match_best(name, query, search_id, match_best)
-    return {"code": 200, "msg": 'ok', "data": {}}
+    return {"code": 200, "msg": 'ok', "data": {'search_id': search_id}}
 
 @app.post('/api/knowledgebase/search_history_delete')
 async def search_history_delete(body: dict):
