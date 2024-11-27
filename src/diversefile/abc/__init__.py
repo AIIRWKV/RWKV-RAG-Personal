@@ -39,15 +39,18 @@ class HtmlCommonLoader(AbstractLoader):
                 yield current_txt
                 current_txt = ''
             current_txt +=  line.strip()
-
+        if current_txt:
+            yield current_txt
 
     @classmethod
-    def parser_txt(cls, txt):
-        if type(txt) != str:
+    def parser_txt(cls, txt, just_need_content=False):
+        if not isinstance(txt, str):
             raise TypeError("txt type should be str!")
         html_doc = readability.Document(txt)
         title = html_doc.title()
         content = html_text.extract_text(html_doc.summary(html_partial=True))
+        if just_need_content:
+            return content
         txt = f"{title}\n{content}"
         sections = txt.split("\n")
         return sections

@@ -5,7 +5,6 @@ API Service
 import json
 import os
 import re
-from collections import defaultdict
 from datetime import date, datetime
 from typing import List
 
@@ -14,8 +13,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from src.utils.loader import Loader
-from src.utils.internet import search_on_baike
+from src.diversefile import Loader
+from src.diversefile import search_on_baike
 from src.utils.tools import quote_filename, get_random_string, number_list_max
 from configuration import config as project_config
 from src.services import index_service_worker, llm_service_worker, files_status_manager
@@ -110,11 +109,6 @@ async def get_collection_file_list_count(name: str, keyword: str=None):
     return {"code": 200, "msg": 'ok', "data": count}
 
 
-async def search_and_notify(search_query, output_dir, output_filename):
-    # Run the async search function
-    msg = await search_on_baike(search_query, output_dir, output_filename)
-    return os.path.join(output_dir, output_filename), msg
-
 @app.get('/api/knowledgebase/internet_search')
 async def internet_search(query: str):
     """
@@ -128,14 +122,8 @@ async def internet_search(query: str):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     try:
-        msg = await search_on_baike(query, output_dir, output_filename)
-        filepath = os.path.join(output_dir, output_filename)
-        if not msg:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                txt = f.read()
-            return {'code': 200, 'data': {'file_path': filepath, 'text': txt}, 'msg': 'ok'}
-        else:
-            return {'code': 400, 'data': {}, 'msg': msg}
+        txt, filepath = search_on_baike(query, output_dir, output_filename)
+        return {'code': 200, 'data': {'file_path': filepath, 'text': txt}, 'msg': 'ok'}
     except Exception as e:
         return {"code": 400, "msg": "发生错误: %s" % str(e), "data": {}}
 
@@ -193,25 +181,20 @@ async def archive_file_knowledgebase(body: dict):
     """
     name: str = body.get('name')
     file_path: str = body.get('file_path')
-    chunk_size: int = body.get('chunk_size', 512)
-    chunk_overlap: int = body.get('chunk_overlap', 0)
+    chunk_size: int = body.get('chunk_size', 256)
 
     if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
         return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
 
     if not (isinstance(chunk_size, int) and 100<chunk_size<=1024):
         return {"code": 400, "msg": '分词长度不合法，请输入100-1024的整数', "data": {}}
-    max_chunk_overlap = int(chunk_size * 0.1)
-    if not (isinstance(chunk_overlap, int) and 0 <= max_chunk_overlap):
-        return {"code": 400, "msg": '分词重叠长度不合法，请输入0-%d的整数' % max_chunk_overlap, "data": {}}
-
     file_path = file_path.strip()
     if not os.path.exists(file_path):
         return {"code": 400, "msg": f'文件{file_path}不存在', "data": {}}
 
 
     try:
-        loader = Loader(file_path, chunk_size, chunk_overlap)
+        loader = Loader(file_path, chunk_size)
     except Exception as e:
         return {"code": 400, "msg": "文件加载和分割过程中出现错误: %s" % str(e), "data": {}}
 
@@ -222,28 +205,24 @@ async def archive_file_knowledgebase(body: dict):
     chunks = loader.load_and_split_file(output_dir)
     success_num = 0
     failed_num = 0
-    path_insert_status = defaultdict(lambda :{'success_num':0, 'failed_num':0})
     for idx, chunk in enumerate(chunks):
-        tmp = [chunk[0]]
+        tmp = [chunk]
         embeddings = llm_service_worker.get_embeddings(
             {'texts': tmp, "bgem3_path": project_config.default_embedding_path})
         try:
             index_service_worker.index_texts({"keys": None, "texts": tmp, "embeddings": embeddings,
                                               'collection_name': name})
             success_num += 1
-            path_insert_status[chunk[1]]['success_num'] += 1
         except Exception as e:
             failed_num += 1
-            path_insert_status[chunk[1]]['failed_num'] += 1
 
     # 记录文件入库状态
-    for path in loader.output_files:
-        if path_insert_status[path]['failed_num'] > 1.5 * path_insert_status[path]['success_num']:
-            files_status_manager.add_file(path,name, 'failed')
-        else:
-            files_status_manager.add_file(path, name)
+    if failed_num > 1.5 * success_num:
+        files_status_manager.add_file(file_path,name, 'failed')
+    else:
+        files_status_manager.add_file(file_path , name)
     return {"code": 200, "msg": 'ok', "data": {'success_num': success_num, 'failed_num': failed_num,
-                                               'file_path': loader.output_files[:500]}}
+                                               'file_path': [loader.output_path]}}
 
 
 

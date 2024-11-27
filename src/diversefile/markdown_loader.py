@@ -14,6 +14,4 @@ class MarkdownLoader(AbstractLoader):
 
         html_str = markdown(txt)
         lines = HtmlCommonLoader(html_str, is_filepath=False).load()
-        for line in lines:
-            yield line
-        del html_str
+        return lines
