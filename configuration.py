@@ -22,25 +22,21 @@ class Configuration:
         self.validate(self.config)
 
     def validate(self, settings):
-        is_init = settings.get('is_init')
-        if not is_init:
-            # 如果没有初始化，不做参数校验
-            return False
         base_model_file = settings.get("base_model_path") or ''
-        if is_init and not base_model_file:
+        if not base_model_file:
             raise ValueError(f"base_model_path is required")
-        if is_init and not os.path.exists(base_model_file):
+        if not os.path.exists(base_model_file):
             raise FileNotFoundError(f"base_model_path {base_model_file} ")
 
         embedding_path = settings.get("embedding_path") or ''
-        if is_init and not embedding_path:
+        if not embedding_path:
             raise ValueError(f"embedding_path is required")
-        if is_init and not os.path.exists(embedding_path):
+        if not os.path.exists(embedding_path):
             raise FileNotFoundError(f"embedding_path {embedding_path} not found")
         rerank_path = settings.get("reranker_path") or ''
-        if is_init and not rerank_path:
+        if not rerank_path:
             raise ValueError(f"reranker_path is required")
-        if is_init and not os.path.exists(rerank_path):
+        if not os.path.exists(rerank_path):
             raise FileNotFoundError(f"reranker_path {rerank_path} not found ")
 
         self.default_base_model_path = base_model_file.strip()
@@ -50,12 +46,12 @@ class Configuration:
         vectordb_name = settings.get("vectordb_name") or 'chromadb'
         self.default_vectordb_name = vectordb_name
         vectordb_path = settings.get("vectordb_path") or ''
-        if is_init and not vectordb_path:
+        if not vectordb_path:
             raise ValueError(f"vectordb_path is required ")
-        if is_init and not os.path.exists(vectordb_path):
+        if not os.path.exists(vectordb_path):
             raise NotADirectoryError(f"vectordb_path {vectordb_path} ")
         vectordb_host = settings.get("vectordb_host", '0.0.0.0')
-        if is_init and not vectordb_host:
+        if not vectordb_host:
             raise ValueError(f"vectordb_host is required for index service")
 
         vectordb_port = settings.get("vectordb_port", '')
@@ -64,7 +60,7 @@ class Configuration:
 
         knowledge_base_path = settings.get("knowledge_base_path", '')
         if knowledge_base_path:
-            if is_init and not os.path.exists(knowledge_base_path):
+            if not os.path.exists(knowledge_base_path):
                 raise NotADirectoryError(f"knowledge_base_path {knowledge_base_path}")
 
     def set_config(self, base_model_path=None, embedding_path=None, reranker_path=None,
@@ -98,7 +94,6 @@ class Configuration:
             self.config['strategy'] = strategy
             is_save = True
         if is_save:
-            self.config['is_init'] = True
             with open(self.config_file_path, "w") as f:
                 yaml.dump(self.config, f)
 

@@ -1,6 +1,5 @@
 base_model_path:
 embedding_path:
-is_init: false
 knowledge_base_path:
 reranker_path:
 strategy:

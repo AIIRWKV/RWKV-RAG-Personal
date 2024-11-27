@@ -44,7 +44,7 @@ class LLMService:
 
 
         strategy = kwargs.get('strategy') or 'cuda fp16'
-        self.model = OriginRWKV(base_rwkv, strategy=strategy)
+        self.model = OriginRWKV(base_rwkv, strategy=strategy, verbose=False)
         info = vars(self.model.args)
         print(f'load model from {base_rwkv},result is {info}')
 
@@ -138,33 +138,28 @@ class LLMService:
 
 
     def sampling_generate(self,instruction,input_text,state_file,
-                          temperature=0.3,
-                          top_p=0.2,
+                          temperature=1,
+                          top_p=0,
                           top_k=0,
-                          alpha_frequency=0.5,
-                          alpha_presence=0.67,
+                          alpha_frequency=0.6,
+                          alpha_presence=0.7,
                           alpha_decay=0.996,
                           template_prompt=None,
                           base_model_path=None,
                          ):
         if base_model_path:
             self.reload_base_model(base_model_path)
-        # if not state_file:
-        #     state_file = self.config.get('state_path')
-        # if state_file:
-        #     states_value = self.load_state_tuning(state_file)
-        # else:
-        #     states_value = None
+
         states_value = None
         gen_args = PIPELINE_ARGS(temperature = temperature, top_p = top_p, top_k=top_k, # top_k = 0 then ignore
                         alpha_frequency = alpha_frequency,
                         alpha_presence = alpha_presence,
                         alpha_decay = alpha_decay, # gradually decay the penalty
                         token_ban = [0], # ban the generation of some tokens
-                        token_stop = [0,1], # stop generation whenever you see any token here
+                        token_stop = [3319, 145, 150], # stop generation whenever you see any token here
                         chunk_len = 256)
         if not template_prompt:
-            ctx = f'Instruction: {instruction}\nInput: {input_text}\n\nResponse:'
+            ctx = f'😺: {instruction}\n\n📋: {input_text}\n\n🤖:'
         else:
             ctx = template_prompt
         try:

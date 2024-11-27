@@ -2,12 +2,15 @@
 """
 API Service
 """
+import asyncio
+import webbrowser
 import json
 import os
 import re
 from datetime import date, datetime
 from typing import List
 
+import aiohttp
 import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -29,12 +32,17 @@ if not os.path.exists(default_knowledge_base_dir):
 app = FastAPI()
 
 # 假设前端文件在 "frontend/" 目录下
-# app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
-#
-#
-# @app.get("/", response_class=FileResponse)
-# async def read_root():
-#     return FileResponse(path="frontend/index.html")
+app.mount("/frontend", StaticFiles(directory="frontend", html=True), name="frontend")
+
+
+@app.get("/", response_class=FileResponse)
+async def read_root():
+    return FileResponse(path="frontend/index.html")
+
+
+@app.get('/api/ok')
+async def ok():
+    return {"code": 200, "msg": "ok", "data": {}}
 
 @app.get('/api/knowledgebase/list')
 async def get_collection_list(keyword: str=None, need_count: bool=False):
@@ -541,24 +549,48 @@ async def modify_config(body: dict):
     if vectordb_port:
         if not ((isinstance(vectordb_port, str) and vectordb_port.isdigit()) or isinstance(vectordb_port, int)):
             return {"code": 400, "msg": 'vectordb_port 必须是数字', "data": {}}
-    if project_config.config.get('is_init') is True:
-        project_config.set_config(model_path, embedding_path, reranker_path, new_knowledge_base_path,
-                              vectordb_path, vectordb_port)
-    else:
-        project_config.set_config(model_path, embedding_path, reranker_path, new_knowledge_base_path,
+
+    project_config.set_config(model_path, embedding_path, reranker_path, new_knowledge_base_path,
                                   vectordb_path, vectordb_port, vectordb_name=vectordb_name)
 
     return {"code": 200, "msg": 'ok', "data": {}}
 
 
-if __name__ == '__main__':
+
+SERVER_PORT = 8080
+
+async def start_server():
+    config = uvicorn.Config(app, host="0.0.0.0", port=SERVER_PORT, )
+    server = uvicorn.Server(config)
     logo = r"""
-             ____  __        __ _  ____     __  ____      _      ____ 
-            |  _ \ \ \      / /| |/ /\ \   / / |  _ \    / \    / ___|
-            | |_) | \ \ /\ / / | ' /  \ \ / /  | |_) |  / _ \  | |  _ 
-            |  _ <   \ V  V /  | . \   \ V /   |  _ <  / ___ \ | |_| |
-            |_| \_\   \_/\_/   |_|\_\   \_/    |_| \_\/_/   \_\ \____|
-                                                                
-    """
+                 ____  __        __ _  ____     __  ____      _      ____
+                |  _ \ \ \      / /| |/ /\ \   / / |  _ \    / \    / ___|
+                | |_) | \ \ /\ / / | ' /  \ \ / /  | |_) |  / _ \  | |  _
+                |  _ <   \ V  V /  | . \   \ V /   |  _ <  / ___ \ | |_| |
+                |_| \_\   \_/\_/   |_|\_\   \_/    |_| \_\/_/   \_\ \____|
+
+        """
     print(logo)
-    uvicorn.run(app, host='0.0.0.0', port=8080)
+    await server.serve()
+
+async def check_server_started():
+    url = f"http://127.0.0.1:{SERVER_PORT}/api/ok"
+    timeout = aiohttp.ClientTimeout(total=1)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        while True:
+            try:
+                async with session.get(url) as response:
+                    if response.status > 0:
+                        return True
+            except (aiohttp.ClientConnectionError, asyncio.TimeoutError):
+                await asyncio.sleep(0.8)
+async def open_browser():
+    await check_server_started()
+    webbrowser.open(f"http://127.0.0.1:{SERVER_PORT}")
+
+async def main():
+    await asyncio.gather(start_server(), open_browser())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
