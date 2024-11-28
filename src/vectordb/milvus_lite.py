@@ -36,7 +36,7 @@ class MilvusLiteManager(AbstractVectorDBManager, ABC):
     def show_collections(self, page: int=None, page_size: int=None):
         client = self.client()
         collections = client.list_collections()
-        return [(i, None) for i in collections] if collections else []
+        return [(i, {"create_time": ""}) for i in collections] if collections else []
 
     def has_collection(self, collection_name: str) -> bool:
         client = self.client()

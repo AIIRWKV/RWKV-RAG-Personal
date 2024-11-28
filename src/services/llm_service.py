@@ -44,7 +44,7 @@ class LLMService:
 
 
         strategy = kwargs.get('strategy') or 'cuda fp16'
-        self.model = OriginRWKV(base_rwkv, strategy=strategy, verbose=False)
+        self.model = OriginRWKV(base_rwkv, strategy=strategy)
         info = vars(self.model.args)
         print(f'load model from {base_rwkv},result is {info}')
 

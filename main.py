@@ -253,17 +253,20 @@ async def search_nearby(name: str, query: str, is_new:bool = False):
     except Exception as e:
        return {"code": 400, "msg": "召回数据失败:%s" % str(e), "data": {}}
 
-    if is_new:
-        # 重新召回删除所有的记录
-        files_status_manager.delete_search_history(name, query)
-
     if documents:
         # 计算最佳匹配值
         cross_scores = llm_service_worker.get_cross_scores({"texts_0": documents,
                                                             "texts_1": [query for i in documents],
                                                             "rerank_path": project_config.default_rerank_path})
         max_value, max_index = number_list_max(cross_scores)
-        search_id = files_status_manager.add_search_history(name, query, documents, documents[max_index])
+        if is_new:
+            # 重新召回删除所有的记录
+            search_id = files_status_manager.delete_search_history(name, query, delete_search=False)
+            files_status_manager.update_search_history(search_id,
+                                                       recall_msg=json.dumps(documents,ensure_ascii=False),
+                                                       match_best=documents[max_index])
+        else:
+            search_id = files_status_manager.add_search_history(name, query, documents, documents[max_index])
     else:
        return {"code": 400, "msg": '相关问题找回失败，换一个问题试试！', }
 
@@ -392,6 +395,8 @@ async def generate(body: dict):
 
     }
     sampling_results = llm_service_worker.sampling_generate(cmd)
+    if isinstance(search_id, str) and search_id.isdigit():
+        search_id = int(search_id)
     if isinstance(search_id, int):
         time2 = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         chat_text = json.dumps([{"role":"user","content":instruction_input, 'time': time1},

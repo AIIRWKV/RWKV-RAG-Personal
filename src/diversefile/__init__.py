@@ -63,7 +63,7 @@ class Loader:
             func = self.load_docx
         elif file_ext == 'pdf':
             func = self.load_pdf
-        elif file_ext == 'xlsx' or 'xls':
+        elif file_ext == 'xlsx' or file_ext == 'xls':
             func = self.load_excel
         elif file_ext in ('txt', 'py', 'js', 'java', 'c', 'cpp', 'h', 'php', 'go', 'ts', 'sh', 'cs', 'kt', 'sql'):
             func = self.load_txt
@@ -74,7 +74,6 @@ class Loader:
         else:
             raise NotImplementedError(
                 "file type not supported yet(pdf, xlsx, docx, txt, markdown, html supported)")
-
         if func and callable(func):
             output_file = os.path.join(output_dir, f"{base_filename}_chunks.txt")
             self.output_path = output_file

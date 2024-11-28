@@ -5,6 +5,7 @@ from multiprocessing import Lock
 from src.services import AbstractServiceWorker
 from src.vectordb import VectorDBError
 from src.vectordb import INIT_VECTORDB_COLLECTION_NAME
+from src.vectordb import get_vectordb_manager
 
     
 class ServiceWorker(AbstractServiceWorker):
@@ -38,14 +39,10 @@ class ServiceWorker(AbstractServiceWorker):
 
     def init_once(self):
         # 启动本地向量数据库服务
-        if self.vectordb_name == 'chromadb':
-            from src.vectordb import ChromaDBManager
-            self.vectordb_manager = ChromaDBManager(self.vectordb_path, self.vectordb_port)
-        elif self.vectordb_name == 'milvus_lite':
-            from src.vectordb import MilvusLiteManager
-            self.vectordb_manager = MilvusLiteManager(self.vectordb_path, self.vectordb_port)
-        else:
+        Manager = get_vectordb_manager(self.vectordb_name)
+        if not Manager:
             raise VectorDBError(f'暂时不支持向量数据库类型:{self.vectordb_name}')
+        self.vectordb_manager = Manager(self.vectordb_path, self.vectordb_port)
         self.vectordb_manager.run()
         time.sleep(5)
 

@@ -13,5 +13,11 @@ from .chroma import ChromaDBManager
 from .errors import VectorDBError, VectorDBCollectionNotExistError, VectorDBCollectionExistError
 
 
-
-
+def get_vectordb_manager(vectordb_name: str):
+    if vectordb_name == 'chromadb':
+        vectordb_manager = ChromaDBManager
+    elif vectordb_name == 'milvus_lite':
+        vectordb_manager = MilvusLiteManager
+    else:
+        return None
+    return vectordb_manager
