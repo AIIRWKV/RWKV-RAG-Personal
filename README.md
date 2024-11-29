@@ -122,7 +122,7 @@ pip3.exe install -r requirements.txt
 ```shell
 python main.py
 ```
-在浏览器中打开 Streamlit 提供的 URL，应当可以看到如下界面：
+服务启动成功后会自动打开浏览器，应当可以看到如下界面：
 
 ![RWKV-RAG-Personal-WebUI-client](./docs/RWKV-RAG-Personal-WebUI-client.png)
 
@@ -131,41 +131,19 @@ python main.py
 
 ## RWKV-RAG-Personal 功能指引
 
-### 模型管理
-模型管理界面用于管理 RWKV-RAG-Personal 系统的基底模型。支持对基底模型进行添加、修改、上线、下线和重启等操作。
+### 知识库
 
-> [!TIP]  
-> 
-> 上线状态的模型才能被使用；下线状态的模型不能被使用。
-> 
-> 重启模型时会影响到正在执行的任务；模型重启后，如果不更改配置文件的基底模型参数base_model_path的值，则后续重启服务时都是用本次更改后的模型作为默认基底模型。
-
-![RWKV-RAG-Personal-Base-Model-Manage](./docs/RWKV-RAG-Personal-Base-Model-Manager.png)
-
-### 知识库管理
-
-知识库管理界面用于管理存储在 ChromaDB 数据库中的知识库，一个collection就是一个知识库，服务启动时默认都会创建一个名为initial的知识库。支持对知识库进行新增、删除和查询知识库内容等操作。
-
-> [!TIP]  
-> 
-> 由于Streamlit架构的限制，新增、删除知识库后，建议刷新 Web 页面同步最新改动。
+知识库管理界面用于管理存储在向量数据库中的知识库，一个collection就是一个知识库，服务启动时默认都会创建一个名为initial的知识库。支持对知识库进行新增、删除和查询知识库内容等操作。
 
 
----
+#### 知识入库
 
-### 知识入库
-
-知识入库界面用于将文本内容**分块索引**到现有的知识库中，已入库的知识可以被检索，用于问答机器人或其他下游服务。
-
-RWKV-RAG-Personal 支持两种不同的知识入库方法，这些方法支持解析 TXT、PDF和Excel 三种文件格式：
+点击某个知识库就可以进入知识库的知识管理页面，如下图，这里包含一些知识管理操作，比如入库。目前支持两种不同的入库方式
 
 - **手动输入：** 在输入框中手动输入或粘贴文本内容，系统会按行对文本进行Chunking（**分块**）
-- **本地文件：** 如果你需要将电脑本地**某个文件**或者**某个目录**下所有文件的内容加入知识库，填写文件或者目录的路径，系统会按照固定长度和块重叠字符数对文件进行Chunking（**分块**）
-
-
-> [!WARNING]  
-> 
-> 支持文本格式或图片格式的PDF文件入库，但是需要提前安装**tesseract**，并需要安装中文语言包(**chi_sim**)
+- **本地文件：** 如果你需要将电脑本地**某个文件**内容加入知识库，填写文件路径，系统会按照固定长度(暂定256,后续会做成可配置)和终止符(```'\n','!','?',';','。','；','！','？'```)结合的策略对文件进行Chunking（**分块**）
+    
+![RWKV-RAG-Personal-Insert-Knowdege](./docs/RWKV-RAG-Personal-Insert-Knowdege.png)
 
 > [!TIP]  
 > 
@@ -182,21 +160,20 @@ RWKV-RAG-Personal 系统提供基于知识库的问答机器人（RWKV-RAG-CHAT�
 
 RWKV-RAG-CHAT 的工作流程如下：
 
-1. **输入查询内容，点击 “召回” 按钮**
+1. **点击“问答”按钮，选择“知识库”，创建新的对话**
 
-2. **RWKV-RAG-Personal 从知识库中提取最相关的知识（文本块）**
+2. **系统会从知识库中提取最相关的知识（文本块）**
 
 3. **rerank 模型对提取出来的文本块进行匹配度打分，选出最佳匹配知识**
 
 4. **在底部输入框中输入问题并点击 “发送” 按钮，与模型聊天**
 
-
+![RWKV-RAG-Personal-Insert-Knowdege](./docs/RWKV-RAG-Personal-Chat.png)
 
 
 ## 未来计划
 
 - 以 ASR 和视觉为主的多模态框架将很快上线。此外，GraphRAG 和提示优化也在开发中。
-- 用更专业的前端技术重构UI界面。
 - 集成全新的一键微调功能。
 
 ## Acknowledgement

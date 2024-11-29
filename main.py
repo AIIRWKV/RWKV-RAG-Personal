@@ -189,7 +189,8 @@ async def archive_file_knowledgebase(body: dict):
     """
     name: str = body.get('name')
     file_path: str = body.get('file_path')
-    chunk_size: int = body.get('chunk_size', 256)
+    file_name : str = body.get('file_name')
+    chunk_size: int = 256 #body.get('chunk_size', 256)
 
     if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
         return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
@@ -210,7 +211,7 @@ async def archive_file_knowledgebase(body: dict):
     output_dir = os.path.join(default_knowledge_base_dir, date_str)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    chunks = loader.load_and_split_file(output_dir)
+    chunks = loader.load_and_split_file(output_dir, file_name)
     success_num = 0
     failed_num = 0
     for idx, chunk in enumerate(chunks):

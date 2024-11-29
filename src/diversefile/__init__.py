@@ -55,8 +55,11 @@ class Loader:
         return loader.load()
 
 
-    def load_and_split_file(self, output_dir: str):
+    def load_and_split_file(self, output_dir: str, file_name=None):
         base_filename, file_ext = os.path.splitext(os.path.basename(self.file_path))
+        if file_name:
+            base_filename = file_name
+
         file_ext = file_ext.lstrip('.')
         file_ext = file_ext.lower()
         if file_ext == 'docx':
