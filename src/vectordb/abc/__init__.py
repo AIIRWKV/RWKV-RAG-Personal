@@ -15,7 +15,7 @@ VECTORDB_USED_LIMIT = {'linux': ['chromadb', 'milvus_lite'],
 
 class AbstractVectorDBManager(ABC):
 
-    def __init__(self, db_path: str, db_port: int, db_host: str= '0.0.0.0'):
+    def __init__(self, db_path: str, db_port: int, db_host: str= '127.0.0.1'):
         self.db_path = db_path
         self.db_port = db_port
         self.db_host = db_host

@@ -34,8 +34,8 @@ if not os.path.exists(default_knowledge_base_dir):
 app = FastAPI()
 
 # 假设前端文件在 "frontend/" 目录下
-app.mount("/frontend", StaticFiles(directory="frontend", html=True), name="frontend")
-templates = Jinja2Templates(directory="/frontend")
+app.mount("/frontend_out", StaticFiles(directory="frontend_out", html=True), name="frontend_out")
+templates = Jinja2Templates(directory="/frontend_out")
 
 
 
@@ -564,13 +564,13 @@ async def modify_config(body: dict):
 # 据路径匹配的先后顺序，将静态文件放在最后
 @app.get("/", response_class=FileResponse)
 async def read_root():
-    return FileResponse(path="frontend/index.html")
+    return FileResponse(path="frontend_out/index.html")
 
 
 @app.get("/{full_path:path}")
 async def serve_static_file(request: Request, full_path: str):
     # 构建文件路径
-    file_path = os.path.join("frontend", full_path)
+    file_path = os.path.join("frontend_out", full_path)
 
     # 检查文件是否存在
     if os.path.exists(file_path):
