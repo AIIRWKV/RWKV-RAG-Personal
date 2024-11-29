@@ -12,9 +12,11 @@ from typing import List
 
 import aiohttp
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.templating import Jinja2Templates
+
 
 from src.diversefile import Loader
 from src.diversefile import search_on_baike
@@ -33,11 +35,8 @@ app = FastAPI()
 
 # 假设前端文件在 "frontend/" 目录下
 app.mount("/frontend", StaticFiles(directory="frontend", html=True), name="frontend")
+templates = Jinja2Templates(directory="/frontend")
 
-
-@app.get("/", response_class=FileResponse)
-async def read_root():
-    return FileResponse(path="frontend/index.html")
 
 
 @app.get('/api/ok')
@@ -561,6 +560,24 @@ async def modify_config(body: dict):
 
     return {"code": 200, "msg": 'ok', "data": {}}
 
+
+# 据路径匹配的先后顺序，将静态文件放在最后
+@app.get("/", response_class=FileResponse)
+async def read_root():
+    return FileResponse(path="frontend/index.html")
+
+
+@app.get("/{full_path:path}")
+async def serve_static_file(request: Request, full_path: str):
+    # 构建文件路径
+    file_path = os.path.join("frontend", full_path)
+
+    # 检查文件是否存在
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    else:
+        # 如果文件不存在，返回 index.html
+        return templates.TemplateResponse("404.html", {"request": request})
 
 
 SERVER_PORT = 8080
