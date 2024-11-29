@@ -15,7 +15,6 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi.templating import Jinja2Templates
 
 
 from src.diversefile import Loader
@@ -35,8 +34,6 @@ app = FastAPI()
 
 # 假设前端文件在 "frontend/" 目录下
 app.mount("/frontend_out", StaticFiles(directory="frontend_out", html=True), name="frontend_out")
-templates = Jinja2Templates(directory="/frontend_out")
-
 
 
 @app.get('/api/ok')
@@ -570,14 +567,17 @@ async def read_root():
 @app.get("/{full_path:path}")
 async def serve_static_file(request: Request, full_path: str):
     # 构建文件路径
-    file_path = os.path.join("frontend_out", full_path)
-
+    _, ext = os.path.splitext(full_path)
+    if ext:
+        file_path = os.path.join("frontend_out", full_path)
+    else:
+        file_path = os.path.join("frontend_out", full_path + ".html")
     # 检查文件是否存在
     if os.path.exists(file_path):
         return FileResponse(file_path)
     else:
         # 如果文件不存在，返回 index.html
-        return templates.TemplateResponse("404.html", {"request": request})
+        return FileResponse("frontend_out/404.html")
 
 
 SERVER_PORT = 8080
