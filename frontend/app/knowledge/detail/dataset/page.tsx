@@ -100,13 +100,12 @@ export default function Dataset() {
   const handleAddFile = async () => {
     setIsCreating(true);
     try {
-      let params = {
-        name: window.localStorage.getItem("knowledgeName") || "",
-        file_name: fileName,
-        text: fileText,
-      };
-
       if (fileAddType === "text") {
+        let params = {
+              name: window.localStorage.getItem("knowledgeName") || "",
+              file_name: fileName,
+              text: fileText,
+             };
         const res = await createKnowledgeText(params);
         if (res.code === 200) {
           toast({
@@ -124,6 +123,11 @@ export default function Dataset() {
           });
         }
       } else {
+        let params = {
+        name: window.localStorage.getItem("knowledgeName") || "",
+        file_path: filePath,
+        file_name: fileName,
+      };
         const res = await createKnowledgeFile(params);
         if (res.code === 200) {
           toast({
