@@ -609,7 +609,10 @@ async def check_server_started():
                 await asyncio.sleep(0.8)
 async def open_browser():
     await check_server_started()
-    webbrowser.open(f"http://127.0.0.1:{SERVER_PORT}")
+    try:
+        webbrowser.open(f"http://127.0.0.1:{SERVER_PORT}")
+    except:
+        pass
 
 async def main():
     await asyncio.gather(start_server(), open_browser())
