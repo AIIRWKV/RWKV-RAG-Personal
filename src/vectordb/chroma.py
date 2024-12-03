@@ -2,12 +2,14 @@
 """
 Windows  Linux都支持
 """
+import os
 import subprocess
 from abc import ABC
 from datetime import datetime
 
 import psutil
 
+from configuration import config as project_config
 from src.vectordb import RECALL_NUMBER
 from src.vectordb import AbstractVectorDBManager
 from src.utils.tools import calculate_string_md5
@@ -27,10 +29,14 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
                 raise VectorDBError('连接Chroma服务失败')
         return self._client
     def run(self):
+        is_start_by_shell = os.environ.get('CHROMADB_START_BY_SHELL', '0') or project_config.config.get('chromadb_start_by_shell', '0')
+        if is_start_by_shell == 1 or is_start_by_shell == '1':
+            # 如果是shell/cmd终端自行启服务的，不需要再去启动服务
+            return
         for proc in psutil.process_iter(['pid', 'name']):
             if 'chroma' == proc.info['name'].lower() or 'chroma.exe' == proc.info['name'].lower():
+                # 这种判断逻辑，如果是/a/bc/python3 /a/bc/bin/chroma run 这种启动命令的话，可能检测不出来
                 return True
-
         print(f"Start chroma db")
         # spawn a process "chroma run --path chroma_path --port chroma_port --host chroma_host"
         command = f"chroma run --path {self.db_path} --port {self.db_port} --host {self.db_host}"
