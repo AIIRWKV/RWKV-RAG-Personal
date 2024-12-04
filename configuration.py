@@ -18,30 +18,35 @@ class Configuration:
         self.default_rerank_path = ''  # 默认rerank路径
         self.default_state_path = '' # 默认state文件
         self.default_vectordb_name = 'chromadb'
+        self.base_model_size = 0
 
         self.validate(self.config)
 
     def validate(self, settings):
         base_model_file = settings.get("base_model_path") or ''
+        base_model_file = base_model_file.strip()
         if not base_model_file:
             raise ValueError(f"base_model_path is required")
         if not os.path.exists(base_model_file):
             raise FileNotFoundError(f"base_model_path {base_model_file} ")
 
         embedding_path = settings.get("embedding_path") or ''
+        embedding_path = embedding_path.strip()
         if not embedding_path:
             raise ValueError(f"embedding_path is required")
         if not os.path.exists(embedding_path):
             raise FileNotFoundError(f"embedding_path {embedding_path} not found")
         rerank_path = settings.get("reranker_path") or ''
+        rerank_path = rerank_path.strip()
         if not rerank_path:
             raise ValueError(f"reranker_path is required")
         if not os.path.exists(rerank_path):
             raise FileNotFoundError(f"reranker_path {rerank_path} not found ")
 
-        self.default_base_model_path = base_model_file.strip()
-        self.default_embedding_path = embedding_path.strip()
-        self.default_rerank_path = rerank_path.strip()
+        self.default_base_model_path = base_model_file
+        self.base_model_size = os.path.getsize(base_model_file)
+        self.default_embedding_path = embedding_path
+        self.default_rerank_path = rerank_path
 
         vectordb_name = settings.get("vectordb_name") or 'chromadb'
         self.default_vectordb_name = vectordb_name
@@ -67,7 +72,8 @@ class Configuration:
                    knowledge_base_path=None, vectordb_path=None, vectordb_port=None,strategy=None, vectordb_name=None):
         is_save = False
         if base_model_path and base_model_path != self.default_base_model_path:
-            self.default_base_model_path = base_model_path.strip()
+            self.default_base_model_path = base_model_path
+            self.base_model_size = os.path.getsize(base_model_path)
             self.config['base_model_path'] = base_model_path
             is_save = True
         if embedding_path and embedding_path != self.default_embedding_path:
@@ -96,6 +102,37 @@ class Configuration:
         if is_save:
             with open(self.config_file_path, "w") as f:
                 yaml.dump(self.config, f)
+
+    def check_cpu_env(self):
+        """
+        check cpu memory
+        :return:
+        """
+        import psutil
+        memory = psutil.virtual_memory()
+        total_memory = memory.total
+        available_memory = memory.available
+        if available_memory < self.base_model_size * 1.1:
+            return (f'Total Memory: {total_memory} bytes, Available Memory: {available_memory} bytes, '
+                    f'base model size: {self.base_model_size} bytes, not enough memory to load the model.')
+        return 'ok'
+
+    def check_gpu_env(self):
+        import torch
+        has_cuda = torch.cuda.is_available()
+        if not has_cuda:
+            return 'CUDA is not available.'
+        cuda_version = torch.version.cuda
+        cuda_version_list = [int(i) for i in cuda_version.split('.')]
+        if cuda_version_list < [12, 1]:
+            return f'CUDA version:{cuda_version} is not supported, please upgrade to 12.1 or higher.'
+
+        # TODO 目前系统默认使用设备0，后续做成可配置的
+        gpu_memory_total = torch.cuda.get_device_properties(0).total_memory
+        if gpu_memory_total < self.base_model_size * 1.25:
+            return f'GPU total Memory:{gpu_memory_total}, base model size:{self.base_model_size}, not enough memory to load the model.'
+        return 'ok'
+
 
 
 config = Configuration("ragq.yml")
