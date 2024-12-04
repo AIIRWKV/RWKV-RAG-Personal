@@ -4,8 +4,6 @@ import traceback
 from typing import List
 import sqlite3
 
-from sklearn.metrics import recall_score
-
 status_table_name = 'file_status' # 记录文件信息
 create_status_table_sql = ("create table if not exists file_status "
                            "(file_path text NOT NULL, "
