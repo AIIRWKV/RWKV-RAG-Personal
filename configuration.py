@@ -2,6 +2,8 @@ import os
 import platform
 import yaml
 
+from multiprocessing import Queue
+
 
 class Configuration:
     def __init__(self, config_file):
@@ -138,3 +140,5 @@ class Configuration:
 config = Configuration("ragq.yml")
 
 OS_NAME = platform.system().lower()
+
+MESSAGE_QUEUE = Queue()

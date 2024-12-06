@@ -15,7 +15,7 @@ class Loader:
     """
     加载器，用来分割本地文件
     """
-    def __init__(self, file_path: str, chunk_size:int):
+    def __init__(self, file_path: str, chunk_size:int, filename: str=None):
         """
         :param file_path: 文件路径或者目录地址
         :param chunk_size: 块大小
@@ -23,6 +23,7 @@ class Loader:
         self.file_path = file_path
         self.chunk_size = chunk_size
         self.output_path = ''
+        self.filename = filename # 用户自定义文件名
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File or Directory not found: {file_path}")
         if os.path.isdir(file_path):
@@ -55,10 +56,10 @@ class Loader:
         return loader.load()
 
 
-    def load_and_split_file(self, output_dir: str, file_name=None):
+    def load_and_split_file(self, output_dir: str):
         base_filename, file_ext = os.path.splitext(os.path.basename(self.file_path))
-        if file_name:
-            base_filename = file_name
+        if self.filename:
+            base_filename = self.filename
 
         file_ext = file_ext.lstrip('.')
         file_ext = file_ext.lower()

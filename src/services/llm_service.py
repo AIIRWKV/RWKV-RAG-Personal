@@ -119,6 +119,7 @@ class LLMService:
         # TODO inputs里每个句子长度不能超过512，会被截断
         if not bgem3_path:
             bgem3_path = self.config.get('embedding_path')
+        print(bgem3_path,'    ooooooooo')
         self.load_bgem3(bgem3_path)
         outputs = self.bgem3.encode(inputs, max_length=512)['dense_vecs'] # List[numpy.ndarray[numpy.float16]]
         return outputs
@@ -178,6 +179,7 @@ class ServiceWorker(AbstractServiceWorker):
     def get_embeddings(self, cmd: dict):
         texts = cmd.get("texts")
         bgem3_path = cmd.get("bgem3_path")
+        print('rrffvsfsdafsafasfaf')
         value = self.llm_service.get_embeddings(texts, bgem3_path)
         return value
 
