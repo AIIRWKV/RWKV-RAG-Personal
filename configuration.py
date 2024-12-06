@@ -142,3 +142,5 @@ config = Configuration("ragq.yml")
 OS_NAME = platform.system().lower()
 
 MESSAGE_QUEUE = Queue()
+
+SERVER_PORT = 8080

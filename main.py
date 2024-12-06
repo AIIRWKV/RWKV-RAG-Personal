@@ -8,9 +8,9 @@ import webbrowser
 import json
 import os
 import re
+import multiprocessing
 from datetime import date, datetime
 from typing import List
-from multiprocessing import Process
 
 import aiohttp
 import uvicorn
@@ -22,7 +22,7 @@ from fastapi.responses import FileResponse
 from src.diversefile import Loader
 from src.diversefile import search_on_baike
 from src.utils.tools import quote_filename, get_random_string, number_list_max
-from configuration import config as project_config, MESSAGE_QUEUE
+from configuration import config as project_config, MESSAGE_QUEUE, SERVER_PORT
 from src.services import index_service_worker, llm_service_worker, files_status_manager
 
 
@@ -179,6 +179,33 @@ async def archive_text_knowledgebase(body: dict):
     return {"code": 200, "msg": 'ok', "data": {'success_num': success_num, 'failed_num': failed_num,
                                                'file_path': output_file}}
 
+@app.post('/api/index/add')
+def add_index(body: dict):
+    text:str = body.get('text')
+    embeddings = body.get('embeddings')
+    name = body.get('name')
+
+    try:
+        index_service_worker.index_texts(
+            {"keys": None, "texts": [text], "embeddings": embeddings, 'collection_name': name})
+    except Exception as e:
+        return {"code": 400, "msg": "添加索引失败:%s" % str(e)}
+    return {"code": 200, "msg": 'ok'}
+
+
+@app.post('/api/filestatus/update')
+def update_filestatus(body: dict):
+    status:str = body.get('status')
+    file_path = body.get('file_path')
+    name = body.get('name')
+
+    try:
+        files_status_manager.update_file_status(file_path, name, status)
+    except Exception as e:
+        return {"code": 400, "msg": "更新失败:%s" % str(e)}
+    return {"code": 200, "msg": 'ok'}
+
+
 
 @app.post('/api/knowledgebase/archive_file')
 async def archive_file_knowledgebase(body: dict):
@@ -207,33 +234,6 @@ async def archive_file_knowledgebase(body: dict):
         return {"code": 400, "msg": "文件加载和分割过程中出现错误: %s" % str(e), "data": {}}
     files_status_manager.add_file(file_path, name, 'waitinglist')
     return {"code": 200, "msg": 'ok', "data": {}}
-
-    # date_str = date.today().strftime("%Y%m%d")
-    # output_dir = os.path.join(default_knowledge_base_dir, date_str)
-    # if not os.path.exists(output_dir):
-    #     os.makedirs(output_dir)
-    # chunks = loader.load_and_split_file(output_dir)
-    # success_num = 0
-    # failed_num = 0
-    # for idx, chunk in enumerate(chunks):
-    #     tmp = [chunk]
-    #     embeddings = llm_service_worker.get_embeddings(
-    #         {'texts': tmp, "bgem3_path": project_config.default_embedding_path})
-    #     try:
-    #         index_service_worker.index_texts({"keys": None, "texts": tmp, "embeddings": embeddings,
-    #                                           'collection_name': name})
-    #         success_num += 1
-    #     except Exception as e:
-    #         failed_num += 1
-    #
-    # # 记录文件入库状态
-    # if failed_num > 1.5 * success_num:
-    #     files_status_manager.add_file(file_path,name, 'failed')
-    # else:
-    #     files_status_manager.add_file(file_path , name)
-    # return {"code": 200, "msg": 'ok', "data": {'success_num': success_num, 'failed_num': failed_num,
-    #                                            'file_path': [loader.output_path]}}
-
 
 
 @app.get('/api/knowledgebase/recall')
@@ -338,7 +338,7 @@ async def get_embeddings(body: dict):
     """
     text = body.get('text')
     if not (text and isinstance(text, str)):
-        return {"code": 400, "msg": '文本不能为空',}
+        return {"code": 400, "msg": '文本不能为空'}
     embeddings = llm_service_worker.get_embeddings({'texts':[text], "bgem3_path": project_config.default_embedding_path})
     return {"code": 200, "msg": 'ok', "data": embeddings.tolist()}
 
@@ -585,53 +585,6 @@ async def serve_static_file(request: Request, full_path: str):
         return FileResponse("frontend_out/404.html")
 
 
-
-
-def custom_do_loader(loader: Loader, name: str, file_path: str, start_idx:int=-1):
-    date_str = date.today().strftime("%Y%m%d")
-    output_dir = os.path.join(default_knowledge_base_dir, date_str)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    chunks = loader.load_and_split_file(output_dir)
-    success_num = 0
-    failed_num = 0
-    for idx, chunk in enumerate(chunks):
-        if idx < start_idx:
-            continue
-        tmp = [chunk]
-        embeddings = llm_service_worker.get_embeddings(
-            {'texts': tmp, "bgem3_path": project_config.default_embedding_path})
-        try:
-            index_service_worker.index_texts({"keys": None, "texts": tmp, "embeddings": embeddings,
-                                              'collection_name': name})
-            success_num += 1
-        except Exception as e:
-            failed_num += 1
-
-    # 记录文件入库状态
-    if failed_num > 1.5 * success_num:
-        files_status_manager.update_file_status(file_path,name, 'failed')
-    else:
-        files_status_manager.update_file_status(file_path , name, 'processed')
-
-
-def custom_server():
-    """
-    消费者:异步消费消息队列内容，主要是文档chunking
-    :return:
-    """
-    while 1:
-        try:
-            item = MESSAGE_QUEUE.get()
-            loader , name, file_path = item
-            if isinstance(loader, Loader):
-                custom_do_loader(loader, name, file_path)
-        except:
-            pass
-
-
-SERVER_PORT = 8080
-
 async def start_server():
     config = uvicorn.Config(app, host="0.0.0.0", port=SERVER_PORT)
     server = uvicorn.Server(config)
@@ -648,7 +601,7 @@ async def start_server():
 
 async def check_server_started():
     url = f"http://127.0.0.1:{SERVER_PORT}/api/ok"
-    timeout = aiohttp.ClientTimeout(total=1)
+    timeout = aiohttp.ClientTimeout(total=2)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         while True:
             try:
@@ -672,7 +625,8 @@ async def main():
 def run():
     asyncio.run(main())
 
+
 if __name__ == "__main__":
-    api_srv = Process(target=run)
-    api_srv.start()
-    custom_server()
+    from async_task import custom_server
+    multiprocessing.Process(target=custom_server).start()
+    run()
