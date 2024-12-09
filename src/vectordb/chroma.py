@@ -7,6 +7,7 @@ import subprocess
 import sys
 from abc import ABC
 from datetime import datetime
+from typing import List
 
 import psutil
 
@@ -109,11 +110,16 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         values = kwargs["texts"]
         collection_name = kwargs.get('collection_name')
         embeddings = kwargs.get('embeddings')
+        file_path = kwargs.get('file_path')
 
         if keys is None or isinstance(keys, list) is False or len(keys) != len(values):
             keys = [calculate_string_md5(value) for value in values]
         client = self.client()
         new_embeddings = [eb for eb in embeddings] # TODO 这一步是多余的吗
+        if file_path:
+            metadatas = [{'source': file_path} for _ in values]
+        else:
+            metadatas = None
         try:
             collection = client.get_collection(collection_name)
         except:
@@ -121,9 +127,24 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         collection.add(
             ids=keys,
             embeddings=new_embeddings,
-            documents=values
+            documents=values,
+            metadatas=metadatas
         )
         # index the value
+        return True
+
+    def delete(self, keys: List[str], collection_name: str):
+        if not keys:
+            return True
+        client = self.client()
+        try:
+            collection = client.get_collection(collection_name)
+        except:
+            raise VectorDBCollectionNotExistError()
+        try:
+            collection.delete(ids=keys)
+        except:
+            pass
         return True
 
     def search_nearby(self, kwargs: dict):
@@ -137,6 +158,15 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         search_result = collection.query(
             query_embeddings=embeddings,
             n_results=RECALL_NUMBER,
-            include=['documents'])
-        return search_result['documents'][0]
+            include=['documents', 'metadatas'])
+        return search_result
+
+    def get_ids_by_metadatas(self, collection_name: str, where: dict, limit: int = 500, offset: int = 0):
+        client = self.client()
+        try:
+            collection = client.get_collection(collection_name)
+        except:
+            raise VectorDBCollectionNotExistError()
+        data = collection.get(where=where, limit=limit, offset=offset, include=[])
+        return data
 

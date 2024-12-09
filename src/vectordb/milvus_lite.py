@@ -6,11 +6,11 @@ Milvus Lite
 import os.path
 import itertools
 from abc import ABC
-
-from websockets.http11 import MAX_LINE_LENGTH
+from typing import List
 
 from src.vectordb import VECTOR_DB_DIMENSION
 from src.vectordb import RECALL_NUMBER
+from src.vectordb import TEXT_MAX_LENGTH
 from src.vectordb import AbstractVectorDBManager
 from src.utils.tools import calculate_string_md5
 from .errors import VectorDBCollectionNotExistError, VectorDBError, VectorDBCollectionExistError
@@ -49,7 +49,7 @@ class MilvusLiteManager(AbstractVectorDBManager, ABC):
             raise VectorDBCollectionExistError()
         fields = [FieldSchema(name='id', dtype=DataType.VARCHAR, descrition='id', is_primary=True, max_length=64),
                   FieldSchema(name='vector', dtype=DataType.FLOAT16_VECTOR, descrition='vector', dim=VECTOR_DB_DIMENSION),
-                  FieldSchema(name='text', dtype=DataType.VARCHAR, descrition='text', max_length=MAX_LINE_LENGTH)
+                  FieldSchema(name='text', dtype=DataType.VARCHAR, descrition='text', max_length=TEXT_MAX_LENGTH)
                   ]
         index_params = client.prepare_index_params()
         index_params.add_index(field_name='vector', metric_type='COSINE',index_type='FLAT',
@@ -86,6 +86,18 @@ class MilvusLiteManager(AbstractVectorDBManager, ABC):
             raise VectorDBError('数据添加失败')
         return True
 
+    def delete(self, keys: List[str], collection_name: str):
+        if not keys:
+            return True
+        client = self.client()
+        if not client.has_collection(collection_name):
+            raise VectorDBCollectionNotExistError()
+        try:
+            client.delete(collection_name, keys)
+        except:
+            pass
+        return True
+
     def search_nearby(self, kwargs: dict):
         collection_name = kwargs.get('collection_name')
         embeddings = kwargs.get('embeddings')
@@ -98,4 +110,7 @@ class MilvusLiteManager(AbstractVectorDBManager, ABC):
                                       output_fields=['text'])
         if search_result:
             return [i['entity']['text'] for i in search_result[0]]
+        return []
+
+    def get_ids_by_metadatas(self, collection_name: str, where: dict, limit: int = 500, offset: int = 0):
         return []

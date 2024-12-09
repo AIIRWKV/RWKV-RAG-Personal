@@ -38,6 +38,13 @@ create_chat_history_table_sql_list = ['create table if not exists chat_history_0
                                       'create table if not exists chat_history_3 (id INTEGER PRIMARY KEY AUTOINCREMENT,search_id INTEGER NOT NULL, chat text not null, create_time text NULL)',
                                       'create table if not exists chat_history_4 (id INTEGER PRIMARY KEY AUTOINCREMENT,search_id INTEGER NOT NULL, chat text not null, create_time text NULL)']
 
+# TODO 个人版元数据直接存储到chromadb向量数据库，个人版向量数据库使用chromadb，其它向量数据库可能不支持Windows版
+# create_knowledge_file_chunk_table_sql_list = ['create table if not exists file_chunk_0 (id text PRIMARY KEY, file_name text not null)',
+#                                       'create table if not exists file_chunk_1 (id text PRIMARY KEY, file_name text not null)',
+#                                       'create table if not exists file_chunk_2 (id text PRIMARY KEY, file_name text not null)',
+#                                       'create table if not exists file_chunk_3 (id text PRIMARY KEY, file_name text not null)',
+#                                       'create table if not exists file_chunk_4 (id text PRIMARY KEY, file_name text not null)']
+
 
 valid_status = ['unprocess', 'waitinglist','processing','processed','failed']
 
@@ -94,6 +101,8 @@ class FileStatusManager:
             db.execute(create_search_history_table_sql)
             for sql in create_chat_history_table_sql_list:
                 db.execute(sql)
+            # for sql in create_knowledge_file_chunk_table_sql_list:
+            #     db.execute(sql)
             try:
                 # 将配置文件的基底模型添加到管理界面
                 db_base_model = self.get_using_base_model()

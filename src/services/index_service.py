@@ -66,3 +66,11 @@ class ServiceWorker(AbstractServiceWorker):
 
     def search_nearby(self, cmd: dict):
        return self.vectordb_manager.search_nearby(cmd)
+
+    def delete(self, cmd: dict):
+        return self.vectordb_manager.delete(keys=cmd.get('keys', []), collection_name=cmd.get('collection_name'))
+
+    def get_ids_by_metadatas(self, cmd: dict):
+        return self.vectordb_manager.get_ids_by_metadatas(collection_name=cmd.get('collection_name'),
+                                                          where=cmd.get('where'), limit=cmd.get('limit'),
+                                                          offset=cmd.get('offset'))

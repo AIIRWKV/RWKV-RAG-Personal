@@ -1,5 +1,6 @@
 #coding=utf-8
 from abc import ABC, abstractmethod
+from typing import List
 
 VECTOR_DB_DIMENSION = 1024  # 向量维度
 
@@ -7,7 +8,7 @@ TEXT_MAX_LENGTH = 512  # 单个文本Embedding最大长度
 
 RECALL_NUMBER = 3  # 召回数量
 INIT_VECTORDB_COLLECTION_NAME = 'initial'
-VECTORDB_USED_LIMIT = {'linux': ['chromadb', 'milvus_lite'],
+VECTORDB_USED_LIMIT = {'linux': ['chromadb'],
                        'windows': ['chromadb']
                        }
 
@@ -45,6 +46,7 @@ class AbstractVectorDBManager(ABC):
         :param page_size:
         :return:
         """
+        pass
 
     @abstractmethod
     def has_collection(self, collection_name: str) -> bool:
@@ -53,6 +55,7 @@ class AbstractVectorDBManager(ABC):
         :param collection_name:
         :return:
         """
+        pass
 
     @abstractmethod
     def create_collection(self, collection_name: str):
@@ -61,6 +64,7 @@ class AbstractVectorDBManager(ABC):
         :param collection_name:
         :return:
         """
+        pass
 
     @abstractmethod
     def delete_collection(self, collection_name: str):
@@ -69,6 +73,7 @@ class AbstractVectorDBManager(ABC):
         :param collection_name:
         :return:
         """
+        pass
 
     @abstractmethod
     def add(self, kwargs: dict):
@@ -81,6 +86,15 @@ class AbstractVectorDBManager(ABC):
             embeddings: List[numpy.ndarray[numpy.float16]]
         :return:
         """
+        pass
+
+    def delete(self, keys: List[str], collection_name: str):
+        """
+        删除向量
+        :param kwargs:
+        :return:
+        """
+        pass
 
     @abstractmethod
     def search_nearby(self, kwargs: dict) -> list[str]:
@@ -91,6 +105,7 @@ class AbstractVectorDBManager(ABC):
             embeddings: List[numpy.ndarray[numpy.float16]]
         :return:
         """
+        pass
 
     @staticmethod
     def padding_vectors(vector: list):

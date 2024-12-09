@@ -2,7 +2,6 @@
 """
 API Service
 """
-import atexit
 import asyncio
 import webbrowser
 import json
@@ -165,7 +164,8 @@ async def archive_text_knowledgebase(body: dict):
                 {'texts': tmp, "bgem3_path": project_config.default_embedding_path})
             try:
                 index_service_worker.index_texts(
-                    {"keys": None, "texts": tmp, "embeddings": embeddings, 'collection_name': name})
+                    {"keys": None, "texts": tmp, "embeddings": embeddings, 'collection_name': name,
+                     'file_path': output_file})
                 success_num += 1
             except Exception as e:
                 failed_num += 1
@@ -184,10 +184,12 @@ def add_index(body: dict):
     text:str = body.get('text')
     embeddings = body.get('embeddings')
     name = body.get('name')
+    file_path = body.get('file_path')
 
     try:
         index_service_worker.index_texts(
-            {"keys": None, "texts": [text], "embeddings": embeddings, 'collection_name': name})
+            {"keys": None, "texts": [text], "embeddings": embeddings, 'collection_name': name,
+             "file_path": file_path})
     except Exception as e:
         return {"code": 400, "msg": "添加索引失败:%s" % str(e)}
     return {"code": 200, "msg": 'ok'}
@@ -234,6 +236,15 @@ async def archive_file_knowledgebase(body: dict):
         return {"code": 400, "msg": "文件加载和分割过程中出现错误: %s" % str(e), "data": {}}
     files_status_manager.add_file(file_path, name, 'waitinglist')
     return {"code": 200, "msg": 'ok', "data": {}}
+
+
+@app.post('/api/knowledge/delete_by_file')
+async def delete_by_file(body: dict):
+    name: str = body.get('name')
+    file_path: str = body.get('file_path')
+    if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
+
 
 
 @app.get('/api/knowledgebase/recall')
