@@ -60,5 +60,5 @@ def number_list_max(nums:List[Union[int, float]]):
             max_index = index
     return max_value, max_index
 
-if __name__ == '__main__':
-    print(number_list_max([-1.1, -1.11, 0]))
+
+

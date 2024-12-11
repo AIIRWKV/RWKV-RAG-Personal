@@ -7,7 +7,7 @@ import webbrowser
 import json
 import os
 import re
-import multiprocessing
+import atexit
 from datetime import date, datetime
 from typing import List
 
@@ -17,11 +17,9 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-
-from src.diversefile import Loader
 from src.diversefile import search_on_baike
 from src.utils.tools import quote_filename, get_random_string, number_list_max
-from configuration import config as project_config, MESSAGE_QUEUE, SERVER_PORT
+from configuration import (config as project_config, SERVER_PORT, AsyncTaskType, MESSAGE_QUEUE)
 from src.services import index_service_worker, llm_service_worker, files_status_manager
 
 
@@ -179,35 +177,6 @@ async def archive_text_knowledgebase(body: dict):
     return {"code": 200, "msg": 'ok', "data": {'success_num': success_num, 'failed_num': failed_num,
                                                'file_path': output_file}}
 
-@app.post('/api/index/add')
-def add_index(body: dict):
-    text:str = body.get('text')
-    embeddings = body.get('embeddings')
-    name = body.get('name')
-    file_path = body.get('file_path')
-
-    try:
-        index_service_worker.index_texts(
-            {"keys": None, "texts": [text], "embeddings": embeddings, 'collection_name': name,
-             "file_path": file_path})
-    except Exception as e:
-        return {"code": 400, "msg": "添加索引失败:%s" % str(e)}
-    return {"code": 200, "msg": 'ok'}
-
-
-@app.post('/api/filestatus/update')
-def update_filestatus(body: dict):
-    status:str = body.get('status')
-    file_path = body.get('file_path')
-    name = body.get('name')
-
-    try:
-        files_status_manager.update_file_status(file_path, name, status)
-    except Exception as e:
-        return {"code": 400, "msg": "更新失败:%s" % str(e)}
-    return {"code": 200, "msg": 'ok'}
-
-
 
 @app.post('/api/knowledgebase/archive_file')
 async def archive_file_knowledgebase(body: dict):
@@ -228,12 +197,10 @@ async def archive_file_knowledgebase(body: dict):
     if not os.path.exists(file_path):
         return {"code": 400, "msg": f'文件{file_path}不存在', "data": {}}
 
+    if os.path.isdir(file_path):
+        return {"code": 400, "msg": '请输入文件路径，而不是文件夹路径', "data": {}}
 
-    try:
-        loader = Loader(file_path, chunk_size, filename=file_name)
-        MESSAGE_QUEUE.put((loader, name, file_path))
-    except Exception as e:
-        return {"code": 400, "msg": "文件加载和分割过程中出现错误: %s" % str(e), "data": {}}
+    MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value, name, file_path, chunk_size, file_name, -1))
     files_status_manager.add_file(file_path, name, 'waitinglist')
     return {"code": 200, "msg": 'ok', "data": {}}
 
@@ -244,6 +211,8 @@ async def delete_by_file(body: dict):
     file_path: str = body.get('file_path')
     if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
         return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
+    MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value, name, file_path, 0, None, -1))
+    return {"code": 200, "msg": 'ok', "data": {}}
 
 
 
@@ -348,9 +317,11 @@ async def get_embeddings(body: dict):
     获取embedding
     """
     text = body.get('text')
-    if not (text and isinstance(text, str)):
+    if not text:
         return {"code": 400, "msg": '文本不能为空'}
-    embeddings = llm_service_worker.get_embeddings({'texts':[text], "bgem3_path": project_config.default_embedding_path})
+    if isinstance(text, str):
+        text = [text]
+    embeddings = llm_service_worker.get_embeddings({'texts':text, "bgem3_path": project_config.default_embedding_path})
     return {"code": 200, "msg": 'ok', "data": embeddings.tolist()}
 
 
@@ -574,6 +545,18 @@ async def modify_config(body: dict):
     return {"code": 200, "msg": 'ok', "data": {}}
 
 
+@app.get('/api/message_queue/get')
+async def get_message_queue():
+    if MESSAGE_QUEUE.empty():
+        return {"code": 200, "msg": '消息队列为空', "data": []}
+    data = []
+    while len(data) < 5 and not MESSAGE_QUEUE.empty():
+        item = MESSAGE_QUEUE.get(timeout=2)
+        data.append(item)
+    return {"code": 200, "msg": 'ok', "data": data}
+
+
+
 # 据路径匹配的先后顺序，将静态文件放在最后
 @app.get("/", response_class=FileResponse)
 async def read_root():
@@ -594,6 +577,22 @@ async def serve_static_file(request: Request, full_path: str):
     else:
         # 如果文件不存在，返回 index.html
         return FileResponse("frontend_out/404.html")
+
+
+
+def save_message_dequeues():
+    """
+    持久化消息队列
+    :return:
+    """
+    data = []
+    if MESSAGE_QUEUE.empty():
+        return
+    while not MESSAGE_QUEUE.empty():
+        item = MESSAGE_QUEUE.get(timeout=2)
+        data.append(item)
+    with open('cache/message_queue.json', 'w') as f:
+        json.dump(data, f, ensure_ascii=False)
 
 
 async def start_server():
@@ -631,13 +630,14 @@ async def open_browser():
 async def main():
     await asyncio.gather(start_server(), open_browser())
 
-
-
 def run():
     asyncio.run(main())
 
+atexit.register(save_message_dequeues)
 
 if __name__ == "__main__":
-    from async_task import custom_server
-    multiprocessing.Process(target=custom_server).start()
+    #from async_task import custom_server
+
+    #multiprocessing.set_start_method('spawn')
+    #multiprocessing.Process(target=custom_server).start()
     run()

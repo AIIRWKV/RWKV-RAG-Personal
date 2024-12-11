@@ -1,5 +1,4 @@
 ﻿# coding=utf-8
-import json
 
 from .abc import AbstractLoader, HtmlCommonLoader
 from .docx_loader import DocxLoader
@@ -26,30 +25,10 @@ class Loader:
         self.chunk_size = chunk_size
         self.output_path = ''
         self.filename = filename # 用户自定义文件名
-        self.current_idx = 0  # 当前处理的进度
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File or Directory not found: {file_path}")
         if os.path.isdir(file_path):
             raise NotImplementedError("Directory is not supported yet")
-
-    def json(self) -> str:
-        return json.dumps({
-            'file_path': self.file_path,
-            'chunk_size': self.chunk_size,
-            'output_path': self.output_path,
-            'filename': self.filename,
-            'current_idx': self.current_idx
-        })
-
-    def all_properties(self):
-        return {
-            'file_path': self.file_path,
-            'chunk_size': self.chunk_size,
-            'output_path': self.output_path,
-            'filename': self.filename,
-            'current_idx': self.current_idx
-        }
-
 
     def load_txt(self):
         loader = TxtLoader(self.file_path, chunk_size=self.chunk_size)

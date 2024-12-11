@@ -105,7 +105,7 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
             raise VectorDBCollectionNotExistError()
         return True
 
-    def add(self,kwargs:dict):
+    def add(self, kwargs:dict):
         keys = kwargs.get("keys")
         values = kwargs["texts"]
         collection_name = kwargs.get('collection_name')

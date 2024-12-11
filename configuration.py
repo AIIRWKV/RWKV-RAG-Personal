@@ -1,8 +1,8 @@
 import os
 import platform
 import yaml
-
-from multiprocessing import Queue
+from enum import Enum
+from queue import Queue
 
 
 class Configuration:
@@ -141,6 +141,14 @@ config = Configuration("ragq.yml")
 
 OS_NAME = platform.system().lower()
 
-MESSAGE_QUEUE = Queue()
-
 SERVER_PORT = 8080
+
+SQLITE_DB_PATH = os.path.join(config.config.get('knowledge_base_path',), 'files_services.db')
+
+
+class AsyncTaskType(Enum):
+    LOADER_DATA_BY_FILE = 1
+    DELETE_DATA_BY_FILE = 2
+
+
+MESSAGE_QUEUE = Queue()

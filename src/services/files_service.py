@@ -1,8 +1,8 @@
 import threading
 import json
-import traceback
 from typing import List
-import sqlite3
+
+from src.utils.sqlitedb import SqliteDB
 
 status_table_name = 'file_status' # 记录文件信息
 create_status_table_sql = ("create table if not exists file_status "
@@ -46,37 +46,9 @@ create_chat_history_table_sql_list = ['create table if not exists chat_history_0
 #                                       'create table if not exists file_chunk_4 (id text PRIMARY KEY, file_name text not null)']
 
 
-valid_status = ['unprocess', 'waitinglist','processing','processed','failed']
+valid_status = ['unprocess', 'waitinglist','processing','processed','failed', 'delete_failed']
 
 
-class SqliteDB:
-    def __init__(self,db_path) -> None:
-        self.db_path = db_path
-        self.connection = None
-        self.cursor = None
-
-    def __enter__(self):
-        try:
-            self.connection = sqlite3.connect(database=self.db_path)
-            self.cursor = self.connection.cursor()
-            return self.cursor
-        except Exception as ex:
-            traceback.print_exc()
-            raise ex
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if not exc_type is None:
-                self.connection.rollback()
-                return False
-            else:
-                self.connection.commit()
-        except Exception as ex:
-            traceback.print_exc()
-            raise ex
-        finally:
-            self.cursor.close()
-            self.connection.close()
 
 
 class FileStatusManager:
