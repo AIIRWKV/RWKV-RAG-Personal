@@ -247,7 +247,10 @@ async def delete_by_file(body: dict):
     code, status = files_status_manager.get_file_status_info(file_path, name)
     if code == 0:
         return {'code': 400, 'msg': '知识库里没有这个文件信息'}
+    if status == 'deleting':
+        return {'code': 400, 'msg': '正在删除中，不能重复删除'}
     if status in ('processed','failed', 'delete_failed'):
+        files_status_manager.update_file_status(file_path, name, 'deleting')
         MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value, name, file_path, 0, None, -1))
         return {"code": 200, "msg": 'ok', "data": {}}
     else:

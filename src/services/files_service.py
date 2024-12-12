@@ -46,7 +46,7 @@ create_chat_history_table_sql_list = ['create table if not exists chat_history_0
 #                                       'create table if not exists file_chunk_4 (id text PRIMARY KEY, file_name text not null)']
 
 
-valid_status = ['unprocess', 'waitinglist','processing','processed','failed', 'delete_failed']
+valid_status = ['unprocess', 'waitinglist','processing','processed','failed', 'deleting','delete_failed']
 
 
 
