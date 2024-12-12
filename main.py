@@ -156,6 +156,7 @@ async def archive_text_knowledgebase(body: dict):
         os.makedirs(output_dir)
     output_file = os.path.join(output_dir, output_filename)
     with open(output_file, 'w', encoding='utf-8') as wf:
+        # TODO 手动输入目前文本长度有限制，不会出现大文本情况，暂时不移到异步处理逻辑里，后续看情况确定
         for idx, chunk in enumerate(payload_texts):
             tmp = [chunk]
             embeddings = llm_service_worker.get_embeddings(
@@ -200,9 +201,41 @@ async def archive_file_knowledgebase(body: dict):
     if os.path.isdir(file_path):
         return {"code": 400, "msg": '请输入文件路径，而不是文件夹路径', "data": {}}
 
+    code = files_status_manager.add_file(file_path, name, 'waitinglist')
+    if code == 0:
+        return {"code": 400, "msg": '该文库已经入库过', "data": {}}
     MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value, name, file_path, chunk_size, file_name, -1))
-    files_status_manager.add_file(file_path, name, 'waitinglist')
     return {"code": 200, "msg": 'ok', "data": {}}
+
+@app.post('/api/knowledgebase/archive_file_reload')
+async def archive_file_knowledgebase(body: dict):
+    """
+    文件重新入库
+    """
+    name: str = body.get('name')
+    file_path: str = body.get('file_path')
+    chunk_size: int = 256 #body.get('chunk_size', 256)
+
+    if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
+
+    if not (isinstance(chunk_size, int) and 100<chunk_size<=1024):
+        return {"code": 400, "msg": '分词长度不合法，请输入100-1024的整数', "data": {}}
+    file_path = file_path.strip()
+    if not os.path.exists(file_path):
+        return {"code": 400, "msg": f'文件{file_path}不存在，无法再重新入库', "data": {}}
+
+    code, status = files_status_manager.get_file_status_info(file_path, name)
+    if code == 0:
+        return {"code": 400, "msg": '该文库已经入库过', "data": {}}
+    if status in ('failed', 'unprocess'):
+        MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value, name, file_path, chunk_size, None, -1))
+        files_status_manager.update_file_status(file_path, name, 'waitinglist')
+        return {"code": 200, "msg": 'ok', "data": {}}
+    elif status == 'delete_failed':
+        return {'code': 400, 'msg': '删除失败的文件，不能重新入库', 'data': {}}
+    else:
+        return {'code': 400, 'msg': '文件正在排队或者入库中或者入库成功，不能重复提交', 'data':{}}
 
 
 @app.post('/api/knowledge/delete_by_file')
@@ -211,8 +244,14 @@ async def delete_by_file(body: dict):
     file_path: str = body.get('file_path')
     if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
         return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
-    MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value, name, file_path, 0, None, -1))
-    return {"code": 200, "msg": 'ok', "data": {}}
+    code, status = files_status_manager.get_file_status_info(file_path, name)
+    if code == 0:
+        return {'code': 400, 'msg': '知识库里没有这个文件信息'}
+    if status in ('processed','failed', 'delete_failed'):
+        MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value, name, file_path, 0, None, -1))
+        return {"code": 200, "msg": 'ok', "data": {}}
+    else:
+        return {'code': 400, 'msg': '正在入库的文件不能删除'}
 
 
 
@@ -230,27 +269,35 @@ async def search_nearby(name: str, query: str, is_new:bool = False):
     embeddings = llm_service_worker.get_embeddings(
         {'texts': [query], "bgem3_path": project_config.default_embedding_path}) # List[numpy.ndarray[numpy.float16]]
     try:
-        documents = index_service_worker.search_nearby(
+        recall_data = index_service_worker.search_nearby(
             {'collection_name': name, "embeddings": embeddings})
     except Exception as e:
        return {"code": 400, "msg": "召回数据失败:%s" % str(e), "data": {}}
-
+    documents = recall_data.get('documents', [])
+    metadatas = recall_data.get('metadatas', []) or []
+    if not metadatas:
+        metadatas = [None] * len(documents)
+    elif len(metadatas) < len(documents):
+        metadatas.extend([None] * (len(documents) - len(metadatas)))
     if documents:
         # 计算最佳匹配值
         cross_scores = llm_service_worker.get_cross_scores({"texts_0": documents,
                                                             "texts_1": [query for i in documents],
                                                             "rerank_path": project_config.default_rerank_path})
         max_value, max_index = number_list_max(cross_scores)
+        documents_metadata = [(documents[i], metadatas[i].get('source') if metadatas[i] and
+                                                                           isinstance(metadatas[i], dict) else '')
+                              for i in range(len(documents))]
         if is_new:
             # 重新召回删除所有的记录
             search_id = files_status_manager.delete_search_history(name, query, delete_search=False)
             files_status_manager.update_search_history(search_id,
-                                                       recall_msg=json.dumps(documents,ensure_ascii=False),
+                                                       recall_msg=json.dumps(documents_metadata,ensure_ascii=False),
                                                        match_best=documents[max_index])
         else:
-            search_id = files_status_manager.add_search_history(name, query, documents, documents[max_index])
+            search_id = files_status_manager.add_search_history(name, query, documents_metadata, documents[max_index])
     else:
-       return {"code": 400, "msg": '相关问题找回失败，换一个问题试试！', }
+       return {"code": 400, "msg": '相关问题召回失败，换一个问题试试！', }
 
     return {"code": 200, "msg": 'ok', "data": {'search_id': search_id}}
 
@@ -305,6 +352,8 @@ async def knowledge_search_history_detail(search_id: int):
         return {"code": 400, "msg": '检索历史不存在', "data": {}}
     try:
         tmp = json.loads(item[3])
+        if isinstance(tmp, list):
+            tmp = [(line[0], line[1]) if isinstance(line, (list, tuple))  else (line, '') for line in tmp]
     except:
         tmp = item[3]
     return {"code": 200, "msg": 'ok', "data": {'search_id': item[0], 'collection_name': item[1], 'query': item[2],
@@ -591,8 +640,9 @@ def save_message_dequeues():
     while not MESSAGE_QUEUE.empty():
         item = MESSAGE_QUEUE.get(timeout=2)
         data.append(item)
-    with open('cache/message_queue.json', 'w') as f:
-        json.dump(data, f, ensure_ascii=False)
+    if data:
+        with open('cache/message_queue.json', 'w', encoding='utf8') as f:
+            json.dump(data, f, ensure_ascii=False)
 
 
 async def start_server():

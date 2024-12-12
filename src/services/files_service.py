@@ -108,6 +108,16 @@ class FileStatusManager:
             result = db.fetchone()
             return result[0] > 0
 
+    def get_file_status_info(self, file_path, collection_name):
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"select status from {status_table_name} where collection_name = ? "
+                       f"and file_path = ?", (collection_name, file_path))
+            result = db.fetchone()
+            if result:
+                return 1, result[0]
+            else:
+                return 0, None
+
     def update_file_status(self,file_path, collection_name, status):
         with SqliteDB(self.db_path) as db:
             db.execute(f"update {status_table_name} set status = ?,last_updated = datetime('now', 'localtime') where collection_name = ? "

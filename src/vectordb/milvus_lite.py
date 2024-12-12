@@ -109,8 +109,8 @@ class MilvusLiteManager(AbstractVectorDBManager, ABC):
                                       search_params={"metric_type": "COSINE", "params": {}},
                                       output_fields=['text'])
         if search_result:
-            return [i['entity']['text'] for i in search_result[0]]
-        return []
+            return {'documents': [i['entity']['text'] for i in search_result[0]], 'metadatas': []}
+        return {'documents': [], 'metadatas': []}
 
     def get_ids_by_metadatas(self, collection_name: str, where: dict, limit: int = 500, offset: int = 0):
         return []

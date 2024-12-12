@@ -159,7 +159,17 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
             query_embeddings=embeddings,
             n_results=RECALL_NUMBER,
             include=['documents', 'metadatas'])
-        return search_result
+        documents = search_result['documents']
+        if documents:
+            document = documents[0]
+        else:
+            document = []
+        metadatas = search_result['metadatas']
+        if metadatas:
+            metadata = metadatas[0]
+        else:
+            metadata = []
+        return {'documents': document, 'metadatas': metadata}
 
     def get_ids_by_metadatas(self, collection_name: str, where: dict, limit: int = 500, offset: int = 0):
         client = self.client()
