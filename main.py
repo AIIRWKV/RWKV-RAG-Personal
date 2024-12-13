@@ -228,14 +228,13 @@ async def archive_file_knowledgebase(body: dict):
     code, status = files_status_manager.get_file_status_info(file_path, name)
     if code == 0:
         return {"code": 400, "msg": '该文库已经入库过', "data": {}}
-    if status in ('failed', 'unprocess'):
+
+    if status in ('delete_failed', 'deleting'):
+        return {'code': 400, 'msg': '删除失败或正在删除的文件，不能重新入库', 'data': {}}
+    else:
         MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value, name, file_path, chunk_size, None, -1))
         files_status_manager.update_file_status(file_path, name, 'waitinglist')
         return {"code": 200, "msg": 'ok', "data": {}}
-    elif status == 'delete_failed':
-        return {'code': 400, 'msg': '删除失败的文件，不能重新入库', 'data': {}}
-    else:
-        return {'code': 400, 'msg': '文件正在排队或者入库中或者入库成功，不能重复提交', 'data':{}}
 
 
 @app.post('/api/knowledge/delete_by_file')

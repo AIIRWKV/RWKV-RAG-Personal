@@ -278,11 +278,11 @@ def custom_server():
         except:
             pass
         if continuous_null_times < 3:
-            time.sleep(5)
+            time.sleep(10)
         elif continuous_null_times >= 300:
             time.sleep(60)
         else:
-            time.sleep(5 + int(continuous_null_times // 25 * 5))
+            time.sleep(10 + int(continuous_null_times // 25 * 5))
 
 def save_message_dequeues():
     """
