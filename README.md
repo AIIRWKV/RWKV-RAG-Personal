@@ -118,9 +118,13 @@ pip3.exe install -r requirements.txt
 ### 4. 启动服务
 
 启动命令如下：
-
+##### Linux
 ```shell
-python main.py
+bash RWKV-RAG.sh
+```
+或者
+```shell
+.RWKV-RAG.sh
 ```
 服务启动成功后会自动打开浏览器，应当可以看到如下界面：
 

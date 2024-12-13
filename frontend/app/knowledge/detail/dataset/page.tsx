@@ -29,20 +29,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { AddFileDialog } from "@/components/knowledge/AddFileDialog";
-import {
-  deleteKnowledgeFile,
-  reloadKnowledgeFile,
-} from "@/api/chat/createKnowledgeRecall";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 interface FileData {
   file_path: string;
@@ -63,8 +49,6 @@ export default function Dataset() {
   const [filePath, setFilePath] = useState("");
   const [searchValue, setSearchValue] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteFilePath, setDeleteFilePath] = useState("");
 
   useEffect(() => {
     handleGetFileListCount();
@@ -96,25 +80,10 @@ export default function Dataset() {
       page_size: pageSize,
       keyword: keyword || "",
     };
+    console.log(params);
 
     getKnowledgeFileList(params).then((res) => {
-      if (res && res.data) {
-        setFiles(res.data);
-        // 如果当前页没有数据且不是第一页，则回到上一页
-        if (res.data.length === 0 && currentPage > 1) {
-          setCurrentPage(currentPage - 1);
-        }
-      } else {
-        setFiles([]);
-      }
-    }).catch((error) => {
-      console.error('Failed to get file list:', error);
-      setFiles([]);
-      toast({
-        variant: "destructive",
-        title: "获取文件列表失败",
-        description: "请稍后重试",
-      });
+      setFiles(res.data || []);
     });
   };
 
@@ -131,13 +100,12 @@ export default function Dataset() {
   const handleAddFile = async () => {
     setIsCreating(true);
     try {
-      let params = {
-        name: window.localStorage.getItem("knowledgeName") || "",
-        file_name: fileName,
-        text: fileText,
-      };
-
       if (fileAddType === "text") {
+        let params = {
+          name: window.localStorage.getItem("knowledgeName") || "",
+          file_name: fileName,
+          text: fileText,
+        };
         const res = await createKnowledgeText(params);
         if (res.code === 200) {
           toast({
@@ -155,6 +123,11 @@ export default function Dataset() {
           });
         }
       } else {
+        let params = {
+          name: window.localStorage.getItem("knowledgeName") || "",
+          file_path: filePath,
+          file_name: fileName,
+        };
         const res = await createKnowledgeFile(params);
         if (res.code === 200) {
           toast({
@@ -204,85 +177,6 @@ export default function Dataset() {
     const value = e.target.value;
     setSearchValue(value);
     handleSearchFileList(value);
-  };
-
-  // 删除文件
-  const handleDeleteFile = async (filePath: string) => {
-    setDeleteFilePath(filePath);
-    setDeleteOpen(true);
-  };
-
-  // 确认删除
-  const handleConfirmDelete = async () => {
-    try {
-      const res = await deleteKnowledgeFile({
-        name: window.localStorage.getItem("knowledgeName") || "",
-        file_path: deleteFilePath,
-      });
-
-      if (res.code === 200) {
-        toast({
-          title: "删除成功",
-          description: "文件已删除",
-        });
-        
-        // 先获取最新的文件总数
-        await handleGetFileListCount();
-        
-        // 如果当前页是最后一页且没有数据了，则回到上一页
-        if (currentPage > 1 && (currentPage - 1) * pageSize >= totalItems) {
-          setCurrentPage(prev => prev - 1);
-        } else {
-          // 否则刷新当前页
-          await handleGetFileList();
-        }
-      } else {
-        toast({
-          variant: "destructive",
-          title: "删除失败",
-          description: res.msg || "操作失败，请重试",
-        });
-      }
-    } catch (error) {
-      console.error('Delete file error:', error);
-      toast({
-        variant: "destructive",
-        title: "删除失败",
-        description: "请求出错，请稍后重试",
-      });
-    } finally {
-      setDeleteOpen(false);
-    }
-  };
-
-  // 重试入库
-  const handleRetryFile = async (filePath: string) => {
-    try {
-      const res = await reloadKnowledgeFile({
-        name: window.localStorage.getItem("knowledgeName") || "",
-        file_path: filePath,
-      });
-      if (res.code === 200) {
-        toast({
-          title: "重试成功",
-          description: "文件正在重新入库",
-        });
-        // 刷新文件列表
-        handleGetFileList();
-      } else {
-        toast({
-          variant: "destructive",
-          title: "重试失败",
-          description: res.msg,
-        });
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "重试失败",
-        description: "请求出错，请稍后重试",
-      });
-    }
   };
 
   return (
@@ -358,11 +252,7 @@ export default function Dataset() {
             </div>
           </div>
           {/* 表格 */}
-          <DatasetTable
-            data={files}
-            onDelete={handleDeleteFile}
-            onRetry={handleRetryFile}
-          />
+          <DatasetTable data={files} />
           {/* 分页 */}
           <PaginationComponent
             currentPage={currentPage}
@@ -388,26 +278,6 @@ export default function Dataset() {
         onSubmit={handleAddFile}
         isLoading={isCreating}
       />
-      {/* 删除确认框 */}
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除这个文件吗？此操作无法撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-500 hover:bg-red-600"
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

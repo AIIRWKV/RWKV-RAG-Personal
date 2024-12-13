@@ -245,8 +245,9 @@ def custom_server():
             continuous_not_runnig_times = 0
         else:
             continuous_not_runnig_times += 1
-        if continuous_not_runnig_times > 6:
+        if continuous_not_runnig_times > 2:
             print('Main process is not running, exit ')
+            # 多进程/线程中终止
             sys.exit(1)
             return
 
