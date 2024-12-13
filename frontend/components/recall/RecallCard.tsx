@@ -52,7 +52,7 @@ export function RecallCard({
           className="mt-2"
         >
           <div className="text-sm space-y-2">
-            <p className="text-gray-700">{content}</p>
+            <p className="text-gray-700">{content[0]}</p>
             {filePath && (
               <div className="pt-2 border-t">
                 <a
