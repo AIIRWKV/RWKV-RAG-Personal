@@ -185,6 +185,15 @@ RWKV-RAG-CHAT 的工作流程如下：
 
 ![RWKV-RAG-Personal-Insert-Knowdege](./docs/RWKV-RAG-Personal-Chat.png)
 
+## 喜欢 RWKV-RAG?🥰 
+如果你喜欢 RWKV-RAG 不妨给我们一个 [⭐ Star](https://github.com/AIIRWKV/RWKV-RAG-Personal) 或者 [👀 Watch](https://github.com/AIIRWKV/RWKV-RAG-Personal/subscription) 我们的项目，从而能马上获得最新的更新！
+你们的每一个鼓励和反馈都能支持我们走得更远。
+
+除了通过以上方式支持我们外，也欢迎各位与我们一起共建 RWKV-RAG。
+
+你可以在阅读教程的时候：
+1. 遇到错别字、句子不通顺，欢迎通过 [RWKV官方论坛](https://community.rwkv.cn/c/12-category/12/) 或者 Github [Issue](https://github.com/AIIRWKV/RWKV-RAG-Personal/issues/new) 给我们反馈，我们会对其进行修改。
+2. 如果你在读教程的过程中，遇到一些不懂的地方，需要求助，可以在我们的 [RWKV官方论坛](https://community.rwkv.cn/c/12-category/12/)提问，亦或者在 Github 上提交求助 [Issue](https://github.com/AIIRWKV/RWKV-RAG-Personal/issues/new) ，我们会尽力帮助你解决问题。
 
 ## 未来计划
 
@@ -193,7 +202,3 @@ RWKV-RAG-CHAT 的工作流程如下：
 
 ## Acknowledgement
 - 所有 RWKV 模型来自 [@BlinkDL](https://github.com/BlinkDL) 的 [RWKV-LM ](https://github.com/BlinkDL/RWKV-LM)项目
-- 项目作者：[YYnil](https://github.com/yynil) ; [Ojiyum](https://github.com/Ojiyumm) ;  [LonghuaLiu](https://github.com/Liu3420175)
-
-
-
