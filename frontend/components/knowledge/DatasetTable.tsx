@@ -67,9 +67,6 @@ export function DatasetTable({ data, onDelete, onRetry }: DatasetTableProps) {
             {data?.map((item, index) => {
               const statusInfo = getStatusInfo(item.status);
               const isDeleting = item.status === "deleting";
-              const canDelete = item.status === "processed";
-              const canRetry =
-                item.status === "failed" || item.status === "delete_failed";
 
               return (
                 <TableRow key={index}>
@@ -87,34 +84,30 @@ export function DatasetTable({ data, onDelete, onRetry }: DatasetTableProps) {
                   </TableCell>
                   <TableCell className="w-[15%]">
                     <div className="flex items-center justify-end gap-1">
-                      {canRetry && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onRetry(item.file_path)}
-                        >
-                          <RotateCw className="h-4 w-4 text-green-500 hover:text-green-700" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onRetry(item.file_path)}
+                      >
+                        <RotateCw className="h-4 w-4 text-green-500 hover:text-green-700" />
+                      </Button>
 
-                      {canDelete && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onDelete(item.file_path)}
-                          disabled={isDeleting}
-                        >
-                          <Trash2
-                            className={`h-4 w-4 ${
-                              isDeleting
-                                ? "text-gray-300"
-                                : "text-gray-500 hover:text-gray-700"
-                            }`}
-                          />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onDelete(item.file_path)}
+                        disabled={isDeleting}
+                      >
+                        <Trash2
+                          className={`h-4 w-4 ${
+                            isDeleting
+                              ? "text-gray-300"
+                              : "text-gray-500 hover:text-gray-700"
+                          }`}
+                        />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
