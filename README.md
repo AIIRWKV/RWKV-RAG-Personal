@@ -55,7 +55,7 @@ git clone https://github.com/AIIRWKV/RWKV-RAG-Personal.git
 
 ### 2. 安装依赖项
    
-进入到项目目录，安装Python依赖
+[创建python虚拟环境](https://blog.csdn.net/ARPOSPF/article/details/113616988)，进入到项目目录，安装Python依赖
 
 ##### Linux
 
@@ -117,15 +117,24 @@ pip3.exe install -r requirements.txt
 
 ### 4. 启动服务
 
-启动命令如下：
+启动服务之前请确保激活上面创建的python虚拟环境
 ##### Linux
+打开Linux终端，启动命令如下：
 ```shell
-bash RWKV-RAG.sh
+bash RWKV-RAG
 ```
 或者
 ```shell
-.RWKV-RAG.sh
+./RWKV-RAG
 ```
+##### Windows
+打开Windows的PowerShell，启动命令如下：
+
+```shell
+.\RWKV-RAG
+```
+
+
 服务启动成功后会自动打开浏览器，应当可以看到如下界面：
 
 ![RWKV-RAG-Personal-WebUI-client](./docs/RWKV-RAG-Personal-WebUI-client.png)
@@ -149,6 +158,8 @@ bash RWKV-RAG.sh
     
 ![RWKV-RAG-Personal-Insert-Knowdege](./docs/RWKV-RAG-Personal-Insert-Knowdege.png)
 
+同时支持删除文件，在删除文件时，会删除文件的在数据库（包括向量数据库）中所有的数据；支持文件重新入库。
+
 > [!TIP]  
 > 
 > RWKV-RAG-Personal 支持从互联网上搜索知识，并将搜索到的知识文本以 TXT 格式保存到**电脑本地的指定目录**。
@@ -166,7 +177,7 @@ RWKV-RAG-CHAT 的工作流程如下：
 
 1. **点击“问答”按钮，选择“知识库”，创建新的对话**
 
-2. **系统会从知识库中提取最相关的知识（文本块）**
+2. **系统会从知识库中提取最相关的知识（文本块）及知识的来源**
 
 3. **rerank 模型对提取出来的文本块进行匹配度打分，选出最佳匹配知识**
 
