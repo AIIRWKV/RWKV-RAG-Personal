@@ -117,21 +117,9 @@ pip3.exe install -r requirements.txt
 
 ### 4. 启动服务
 
-启动服务之前请确保激活上面创建的python虚拟环境
-##### Linux
-打开Linux终端，启动命令如下：
+启动服务之前请确保激活上面创建的python虚拟环境,打开Linux终端(Windows系统推荐使用PowerShell)，启动命令如下：
 ```shell
-bash RWKV-RAG
-```
-或者
-```shell
-./RWKV-RAG
-```
-##### Windows
-打开Windows的PowerShell，启动命令如下：
-
-```shell
-.\RWKV-RAG
+Windows的PowerShell
 ```
 
 

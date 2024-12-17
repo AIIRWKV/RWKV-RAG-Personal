@@ -1,4 +1,0 @@
-﻿#!/bin/bash
-
-python3 async_task.py &
-python3 main.py

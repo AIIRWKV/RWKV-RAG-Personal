@@ -7,6 +7,8 @@ import webbrowser
 import json
 import os
 import re
+import sys
+import subprocess
 import atexit
 from datetime import date, datetime
 from typing import List
@@ -688,8 +690,6 @@ def run():
 atexit.register(save_message_dequeues)
 
 if __name__ == "__main__":
-    #from async_task import custom_server
-
-    #multiprocessing.set_start_method('spawn')
-    #multiprocessing.Process(target=custom_server).start()
+    command = f'{sys.executable} async_task.py'
+    subprocess.Popen(command, shell=True)
     run()
