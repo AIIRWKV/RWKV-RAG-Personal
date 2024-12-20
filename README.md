@@ -119,7 +119,7 @@ pip3.exe install -r requirements.txt
 
 启动服务之前请确保激活上面创建的python虚拟环境,打开Linux终端(Windows系统推荐使用PowerShell)，启动命令如下：
 ```shell
-Windows的PowerShell
+python main.py
 ```
 
 
