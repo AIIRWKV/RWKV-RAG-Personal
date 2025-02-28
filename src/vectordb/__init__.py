@@ -10,6 +10,7 @@ from .abc import INIT_VECTORDB_COLLECTION_NAME
 from .abc import TEXT_MAX_LENGTH
 from .milvus_lite import MilvusLiteManager
 from .chroma import ChromaDBManager
+from .milvus import MilvusManager
 from .errors import VectorDBError, VectorDBCollectionNotExistError, VectorDBCollectionExistError
 
 
@@ -18,6 +19,8 @@ def get_vectordb_manager(vectordb_name: str):
         vectordb_manager = ChromaDBManager
     elif vectordb_name == 'milvus_lite':
         vectordb_manager = MilvusLiteManager
+    elif vectordb_name == 'milvus':
+        vectordb_manager = MilvusManager
     else:
         return None
     return vectordb_manager

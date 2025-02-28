@@ -42,7 +42,7 @@ class ServiceWorker(AbstractServiceWorker):
         Manager = get_vectordb_manager(self.vectordb_name)
         if not Manager:
             raise VectorDBError(f'暂时不支持向量数据库类型:{self.vectordb_name}')
-        self.vectordb_manager = Manager(self.vectordb_path, self.vectordb_port)
+        self.vectordb_manager = Manager(self.vectordb_path, self.vectordb_port, self.vectordb_host)
         self.vectordb_manager.run()
         time.sleep(5)
 
