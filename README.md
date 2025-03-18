@@ -16,7 +16,7 @@ RWKV-RAG-Personal 是RWKV-RAG 个人版，它是一个基于 RWKV 模型的一�
 
 完整的 RWKV-RAG-Personal 服务需要以下模型文件，请将以下模型下载到工作区：
 
-- 下载 RWKV base model（基底模型）：[HuggingFace下载地址](https://huggingface.co/SupYumm/rwkv6_rag_qabot/tree/main)
+- 下载 RWKV base model（基底模型）：[HuggingFace下载地址](https://huggingface.co/BlinkDL/rwkv-7-world/resolve/main/RWKV-x070-World-2.9B-v3-20250211-ctx4096.pth?download=true)  [modelscope下载地址](https://modelscope.cn/models/Blink_DL/rwkv-7-world/resolve/master/RWKV-x070-World-2.9B-v3-20250211-ctx4096.pth)
 - 下载 BGEM3 重排序模型（rerank model）：[HuggingFace下载地址](https://huggingface.co/BAAI/bge-reranker-v2-m3)  [modelscope下载地址](https://modelscope.cn/models/BAAI/bge-reranker-v2-m3)
 - 下载 BGEM3 Embedding 模型: [HuggingFace下载地址](https://huggingface.co/BAAI/bge-m3)   [modelscope下载地址](https://modelscope.cn/models/BAAI/bge-m3)
 
@@ -26,15 +26,17 @@ RWKV-RAG-Personal 是RWKV-RAG 个人版，它是一个基于 RWKV 模型的一�
 > 
 > <img src="./docs/models_example.png" alt="description" style="width: 50%; height: auto;"/>
 >
-> 请确认设备 VRAM 并选择一个合适的 RWKV 模型作为 RWKV-RAG-Personal 系统。以下是各参数 RWKV 模型的**推理 VRAM 需求**:
+> 请确认设备 VRAM 并选择一个合适的 RWKV 模型作为 RWKV-RAG-Personal 系统。**我们推荐使用最新版的RWKV-7(注意:更新最新的rwkv依赖包)， 它回答问题的效果比RWKV6好很多**，以下是各参数 RWKV 模型的**推理 VRAM 需求**:
 > 
 > | SIZE        | VRAM |
 > -------------|-----
+> | RWKV-7-2B9 |  7G |
 > | RWKV-6-1B6  | 4G   |
 > | RWKV-6-3B   | 7.5G |
 > | RWKV-6-7B   | 18G |
 > | RWKV-6-12B  | 24G|
 > |  RWKV-6-14B |30G|
+> 
 > 
 
 
@@ -91,6 +93,7 @@ pip3.exe install -r requirements.txt
 可以通过修改项目配置文件 `ragq.yml` 修改配置参数，配置参数含义如下：
 
 ##### 模型相关参数
+- **rwkv_version**: RWKV 基底模型版本，x070：RWKV-7  x060: RWKV-6
 - **base_model_path**: RWKV 基底模型的路径，请参考 [RWKV 模型下载](https://rwkv.cn/RWKV-Fine-Tuning/Introduction#%E4%B8%8B%E8%BD%BD%E5%9F%BA%E5%BA%95-rwkv-%E6%A8%A1%E5%9E%8B) 
 - **embedding_path**: 嵌入模型的路径，推荐使用: bge-m31
 - **reranker_path**: 重排序模型的路径，推荐使用: BAAIbge-reranker-v2-m3
@@ -98,7 +101,7 @@ pip3.exe install -r requirements.txt
 ##### 数据库相关参数
 
 - **vectordb_name**: 向量数据库名词，目前已集成如下向量数据库：
-  - **Linux**：chromadb,milvus Lite版
+  - **Linux**：chromadb,milvus Lite版, milvus Standalone版
   - **Windows**: chromadb
   
   > [!WARNING]
@@ -185,7 +188,7 @@ RWKV-RAG-CHAT 的工作流程如下：
 
 ## 未来计划
 
-- 以 ASR 和视觉为主的多模态框架将很快上线。此外，GraphRAG 和提示优化也在开发中。
+- 以 ASR 和视觉为主的多模态框架将很快上线。
 - 集成全新的一键微调功能。
 
 ## Acknowledgement

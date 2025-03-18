@@ -21,10 +21,14 @@ class Configuration:
         self.default_state_path = '' # 默认state文件
         self.default_vectordb_name = 'chromadb'
         self.base_model_size = 0
+        self.default_rwkv_version = 'x070'
 
         self.validate(self.config)
 
     def validate(self, settings):
+        rwkv_version = settings.get("rwkv_version") or self.default_rwkv_version
+        if rwkv_version not in ['x070', 'x060']:
+            raise ValueError(f"rwkv_version must be 'x060' or 'x070'")
         base_model_file = settings.get("base_model_path") or ''
         base_model_file = base_model_file.strip()
         if not base_model_file:
@@ -45,6 +49,7 @@ class Configuration:
         if not os.path.exists(rerank_path):
             raise FileNotFoundError(f"reranker_path {rerank_path} not found ")
 
+        self.default_rwkv_version = rwkv_version
         self.default_base_model_path = base_model_file
         self.base_model_size = os.path.getsize(base_model_file)
         self.default_embedding_path = embedding_path

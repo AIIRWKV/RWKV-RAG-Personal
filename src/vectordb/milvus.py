@@ -113,28 +113,31 @@ class MilvusManager(AbstractVectorDBManager, ABC):
         return True
 
     def search_nearby(self, kwargs: dict):
+        print(kwargs)
         collection_name = kwargs.get('collection_name')
         embeddings = kwargs.get('embeddings')
         client = self.client()
+        client.load_collection(collection_name)
         try:
-            collection = client.get_collection(collection_name)
-        except:
-            raise VectorDBCollectionNotExistError()
-        search_result = collection.query(
-            query_embeddings=embeddings,
-            n_results=RECALL_NUMBER,
-            include=['documents', 'metadatas'])
-        documents = search_result['documents']
-        if documents:
-            document = documents[0]
-        else:
-            document = []
-        metadatas = search_result['metadatas']
-        if metadatas:
-            metadata = metadatas[0]
-        else:
-            metadata = []
-        return {'documents': document, 'metadatas': metadata}
+            res = client.search(
+                collection_name=collection_name,
+                anns_field="vector",
+                data=[embeddings],
+                limit=RECALL_NUMBER,
+                #partition_names=['shard0'],
+                output_fields=['text'],
+                search_params={"metric_type": "COSINE"}
+            )
+        except Exception as e:
+           raise VectorDBError(message=str(e))
+        documents = []
+        for hits in res:
+            for hit in hits:
+                documents.append({'text':hit['entity']['text'], 'score':hit['distance']})
+        sorted(documents, key=lambda x: x['score'])
+        documents = [i['text'] for i in documents]
+        return {'documents': documents, 'metadatas': []}
+
 
     def get_ids_by_metadatas(self, collection_name: str, where: dict, limit: int = 500, offset: int = 0):
         client = self.client()

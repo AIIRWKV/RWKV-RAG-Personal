@@ -296,12 +296,12 @@ async def search_nearby(name: str, query: str, is_new:bool = False):
             # 重新召回删除所有的记录
             search_id = files_status_manager.delete_search_history(name, query, delete_search=False)
             files_status_manager.update_search_history(search_id,
-                                                       recall_msg=json.dumps(documents_metadata,ensure_ascii=False),
+                                                       recall_msg=json.dumps(documents_metadata, ensure_ascii=False),
                                                        match_best=documents[max_index])
         else:
             search_id = files_status_manager.add_search_history(name, query, documents_metadata, documents[max_index])
     else:
-       return {"code": 400, "msg": '相关问题召回失败，换一个问题试试！', }
+        return {"code": 400, "msg": '相关问题召回失败，换一个问题试试！', }
 
     return {"code": 200, "msg": 'ok', "data": {'search_id': search_id}}
 

@@ -6,18 +6,25 @@ from typing import List
 import numpy
 import torch
 from FlagEmbedding import FlagReranker, BGEM3FlagModel
-from rwkv.model import RWKV as OriginRWKV
 from rwkv.utils import PIPELINE, PIPELINE_ARGS
 
 from src.services import AbstractServiceWorker
+from configuration import config
 
 os.environ['RWKV_JIT_ON'] = '1'
 os.environ['RWKV_T_MAX'] = '4096'
 os.environ['RWKV_FLOAT_MODE'] = 'bf16'
 os.environ['RWKV_HEAD_SIZE_A'] = '64'
 os.environ['RWKV_T_MAX'] = '4096'
-os.environ["RWKV_MY_TESTING"]='x060'
 os.environ['RWKV_CTXLEN'] = '4096'
+if config.default_rwkv_version == 'x070':
+    os.environ["RWKV_MY_TESTING"] = 'x070'
+    os.environ['RWKV_V7_ON'] = '1'
+else:
+    os.environ["RWKV_MY_TESTING"] = 'x060'
+
+# v6， v7的相关类导出逻辑不一样，建议这个包的导入放在设置环境变量RWKV_V7_ON之后
+from rwkv.model import RWKV as OriginRWKV
 
 
 
@@ -44,7 +51,11 @@ class LLMService:
 
 
         strategy = kwargs.get('strategy') or 'cuda fp16'
-        self.model = OriginRWKV(base_rwkv, strategy=strategy)
+        if os.environ.get('RWKV_V7_ON') == '1':
+            base_rwkv_rename = base_rwkv.rstrip('.pth')
+        else:
+            base_rwkv_rename = base_rwkv
+        self.model = OriginRWKV(base_rwkv_rename, strategy=strategy)
         info = vars(self.model.args)
         print(f'load model from {base_rwkv},result is {info}')
 
@@ -139,10 +150,10 @@ class LLMService:
 
     def sampling_generate(self,instruction,input_text,state_file,
                           temperature=1,
-                          top_p=0,
+                          top_p=0.3,
                           top_k=0,
-                          alpha_frequency=0.6,
-                          alpha_presence=0.7,
+                          alpha_frequency=0,
+                          alpha_presence=1,
                           alpha_decay=0.996,
                           template_prompt=None,
                           base_model_path=None,
@@ -151,15 +162,16 @@ class LLMService:
             self.reload_base_model(base_model_path)
 
         states_value = None
-        gen_args = PIPELINE_ARGS(temperature = temperature, top_p = top_p, top_k=top_k, # top_k = 0 then ignore
-                        alpha_frequency = alpha_frequency,
-                        alpha_presence = alpha_presence,
-                        alpha_decay = alpha_decay, # gradually decay the penalty
-                        token_ban = [0], # ban the generation of some tokens
-                        token_stop = [3319, 145, 150], # stop generation whenever you see any token here
+        gen_args = PIPELINE_ARGS(
+            #temperature = temperature, top_p = top_p, top_k=top_k, # top_k = 0 then ignore
+            #            alpha_frequency = alpha_frequency,
+            #            alpha_presence = alpha_presence,
+            #             alpha_decay = alpha_decay, # gradually decay the penalty
+            #             token_ban = [0], # ban the generation of some tokens
+            #             token_stop = [3319, 145, 150], # stop generation whenever you see any token here
                         chunk_len = 256)
         if not template_prompt:
-            ctx = f'😺: {instruction}\n\n📋: {input_text}\n\n🤖:'
+            ctx = f'Instruction: 阅读下面内容，问：{instruction}\n\nInput: {input_text}\n\nResponse: '
         else:
             ctx = template_prompt
         try:
