@@ -1,3 +1,4 @@
+rwkv_version: x070
 base_model_path:
 embedding_path:
 knowledge_base_path:
