@@ -162,18 +162,20 @@ class LLMService:
             self.reload_base_model(base_model_path)
 
         states_value = None
+        # f'{input_text}\n\nUser: {instruction}\n\nAssistant: ' 这种格式的prompt,终止符是\n\nUser
         gen_args = PIPELINE_ARGS(
             #temperature = temperature, top_p = top_p, top_k=top_k, # top_k = 0 then ignore
             #            alpha_frequency = alpha_frequency,
             #            alpha_presence = alpha_presence,
-            #             alpha_decay = alpha_decay, # gradually decay the penalty
+                         alpha_decay = alpha_decay, # gradually decay the penalty
             #             token_ban = [0], # ban the generation of some tokens
-            #             token_stop = [3319, 145, 150], # stop generation whenever you see any token here
+                        token_stop = [261, 24281], # stop generation whenever you see any token here
                         chunk_len = 256)
         if not template_prompt:
-            ctx = f'Instruction: 阅读下面内容，问：{instruction}\n\nInput: {input_text}\n\nResponse: '
+            ctx = f'{input_text}\n\nUser: {instruction}\n\nAssistant: '
         else:
             ctx = template_prompt
+        print(ctx)
         try:
             pipeline = PIPELINE(self.model, "rwkv_vocab_v20230424")
             output = pipeline.generate(ctx, token_count=1200, args=gen_args, state=states_value)
