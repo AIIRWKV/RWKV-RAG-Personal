@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  rag-test:
+    image: ragt
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      - D:/work/lib:/app/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+
+    command: streamlit run client.py
