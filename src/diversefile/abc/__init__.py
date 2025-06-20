@@ -25,6 +25,9 @@ class AbstractLoader(ABC):
 
 
 class HtmlCommonLoader(AbstractLoader):
+    """
+    html 解析，用的是非AI方式
+    """
 
     def load(self):
         if self.is_filepath:
@@ -43,14 +46,11 @@ class HtmlCommonLoader(AbstractLoader):
             yield current_txt
 
     @classmethod
-    def parser_txt(cls, txt, just_need_content=False):
-        if not isinstance(txt, str):
-            raise TypeError("txt type should be str!")
+    def parser_txt(cls, txt):
         html_doc = readability.Document(txt)
-        title = html_doc.title()
         content = html_text.extract_text(html_doc.summary(html_partial=True))
-        if just_need_content:
-            return content
-        txt = f"{title}\n{content}"
-        sections = txt.split("\n")
+        sections = content.split("\n")
+        sections = [section for section in sections if section.strip()]
         return sections
+
+

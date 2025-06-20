@@ -19,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from src.diversefile import search_on_baike
+from src.diversefile import search_internet
 from src.utils.tools import quote_filename, get_random_string, number_list_max
 from configuration import (config as project_config, SERVER_PORT, AsyncTaskType, MESSAGE_QUEUE)
 from src.services import index_service_worker, llm_service_worker, files_status_manager

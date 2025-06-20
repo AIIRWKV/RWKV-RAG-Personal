@@ -7,7 +7,7 @@ from .html_loader import HtmlLoader
 from .markdown_loader import MarkdownLoader
 from .txt_loader import TxtLoader
 from .pdf_loader import PDFLoader
-from .internet_search import search_on_baike
+from .internet_search import search_internet
 
 
 import os
