@@ -91,7 +91,6 @@ class BaiduSearch(BaseSearch):
 
         urls2 = [line['url'] for line in result2]
         html_texts2 = await self.batch_scrape_url_content(urls2)
-        new_result = []
         for i, html_tex in enumerate(html_texts2):
             if html_tex:
                 texts = HtmlCommonLoader.parser_txt(html_tex)
@@ -191,13 +190,35 @@ class DuckDuckGoSearch(BaseSearch):
     """
     DuckDuckGo 搜索
     """
-    def search(self, query, max_results=20):
+    async def search(self, query, deepsearch=False):
         from duckduckgo_search import DDGS
 
         with DDGS() as ddgs:
-            data = ddgs.text(query, max_results=max_results, region='cn-zh')
-            return data
+            result = ddgs.text(query, max_results=20, region='cn-zh')
+            urls = []
+            for item in result:
+                url = item.pop('href')
+                body = item.pop('body')
+                urls.append(url)
+                item['url'] = url
+                item['snippet'] = body
 
+            html_texts = await self.batch_scrape_url_content(urls)
+            new_result = []
+            for i, html_tex in enumerate(html_texts):
+                if html_tex:
+                    texts = HtmlCommonLoader.parser_txt(html_tex)
+                    if texts:
+                        text = '\n'.join(texts)
+                        if deepsearch:
+                            result[i]['summary'] = text
+                            new_result.append(result[i])
+                        else:
+                            text = text_summary(text)
+                            if text:
+                                result[i]['summary'] = text_summary(text)
+                                new_result.append(result[i])
+            return new_result
 
 
 async def search_internet(query, deepsearch=False, search_engine_name='baidu'):
