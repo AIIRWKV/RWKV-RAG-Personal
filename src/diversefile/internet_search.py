@@ -71,6 +71,7 @@ class BaiduSearch(BaseSearch):
         # 主要爬取咨询和笔记两个部分的联网搜索
         result1 = await self._search_note(query)
         result2 = await self._search_news(query)
+        yield result1 + result2
 
         urls1 = [line['url'] for line in result1] # 百度笔记，百度站内搜索，太频繁会限频
         html_texts1 = await self.batch_scrape_url_content(urls1, sleep_time_max=2)
@@ -86,7 +87,7 @@ class BaiduSearch(BaseSearch):
                     else:
                         text = text_summary(text)
                         if text:
-                            result1[i]['summary'] = text_summary(text)
+                            result1[i]['summary'] = text
                             new_result.append(result1[i])
 
         urls2 = [line['url'] for line in result2]
@@ -102,10 +103,10 @@ class BaiduSearch(BaseSearch):
                     else:
                         text = text_summary(text)
                         if text:
-                            result2[i]['summary'] = text_summary(text)
+                            result2[i]['summary'] = text
                             new_result.append(result2[i])
 
-        return new_result
+        yield new_result
 
     async def _search_note(self, query):
         note_url = f'https://www.baidu.com/s?pd=note&rpf=pc&word={query}'
@@ -225,17 +226,8 @@ async def search_internet(query, deepsearch=False, search_engine_name='baidu'):
     if search_engine_name == 'baidu':
         b = BaiduSearch()
         await b.setup()
-        result = await b.search(query, deepsearch)
+        result =  b.search(query, deepsearch)
         return result
     return []
 
-# if __name__ == '__main__':
-#     import time
-#     t1 = time.time()
-#     a = asyncio.run(search_internet("为什么很多年轻人陷入消费主义，点都点不醒？", ))
-#     t2 =  time.time()
-#     print(a)
-#     print(len(a))
-#     print(t2-t1)
-#     #bn = summarize_url('https://mbd.baidu.com/newspage/data/dtlandingsuper?nid=dt_4744304537815576108&sourceFrom=search_b')
-#    # print(bn)
+
