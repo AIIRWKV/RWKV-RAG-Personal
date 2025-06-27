@@ -6,10 +6,15 @@ from src.utils.sqlitedb import SqliteDB
 
 status_table_name = 'file_status' # 记录文件信息
 create_status_table_sql = ("create table if not exists file_status "
-                           "(file_path text NOT NULL, "
-                           "collection_name text NOT NULL, "
-                           "status text, "
-                           "last_updated text NULL, "
+                           "(file_path text NOT NULL, " # 文件路径
+                           "collection_name text NOT NULL, " # 数据集名称
+                           "status text, " # 解析状态
+                           "last_updated text NULL, " # 最后更新时间
+                           "chunk_num INTEGER DEFAULT 0," # 分块数
+                           "chunk_method text DEFAULT 'General'," # 切片方法
+                           "is_used INTEGER DEFAULT 1,"  # 是否启用
+                           "chunked_file_path text ,"  # 切片后文件路径
+                           "chunked_log_file_path text," # 切片后日志路径
                            "primary key(collection_name,file_path))")
 
 create_base_model_table_sql = ("create table if not exists base_model_status "
@@ -130,10 +135,10 @@ class FileStatusManager:
         """
         with SqliteDB(self.db_path) as db:
             if not keyword:
-                db.execute(f"select file_path, last_updated, status from {status_table_name} where collection_name = ? limit ? offset ?",
+                db.execute(f"select file_path, last_updated, status, chunk_num, chunk_method, is_used, chunked_file_path, chunked_log_file_path from {status_table_name} where collection_name = ? limit ? offset ?",
                        (collection_name, page_size, page * page_size - page_size))
             else:
-                db.execute(f"select file_path, last_updated, status from {status_table_name} where collection_name = ? and file_path like ? limit ? offset ?",
+                db.execute(f"select file_path, last_updated, status , chunk_num, chunk_method, is_used, chunked_file_path, chunked_log_file_path from {status_table_name} where collection_name = ? and file_path like ? limit ? offset ?",
                        (collection_name, '%'+keyword+'%', page_size, page * page_size - page_size))
             result = db.fetchall()
             return result

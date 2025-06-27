@@ -152,8 +152,8 @@ SQLITE_DB_PATH = os.path.join(config.config.get('knowledge_base_path',), 'files_
 
 
 class AsyncTaskType(Enum):
-    LOADER_DATA_BY_FILE = 1
-    DELETE_DATA_BY_FILE = 2
+    LOADER_DATA_BY_FILE = 1  #  切片数据
+    DELETE_DATA_BY_FILE = 2  # 删除数据
 
 
 MESSAGE_QUEUE = Queue()

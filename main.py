@@ -20,16 +20,27 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from src.diversefile import search_internet
-from src.utils.tools import quote_filename, get_random_string, number_list_max
-from configuration import (config as project_config, SERVER_PORT, AsyncTaskType, MESSAGE_QUEUE)
-from src.services import index_service_worker, llm_service_worker, files_status_manager
+from src.utils.tools import (quote_filename,
+                             get_random_string,
+                             number_list_max)
+from configuration import (config as project_config,
+                           SERVER_PORT,
+                           AsyncTaskType,
+                           MESSAGE_QUEUE)
+from src.services import (index_service_worker,
+                          #llm_service_worker,
+                          files_status_manager)
 
 
 knowledge_base_path = project_config.config.get('knowledge_base_path')
-default_knowledge_base_dir = os.path.join(knowledge_base_path, "knowledge_data") # 默认联网知识的存储位置
+default_knowledge_base_dir = os.path.join(knowledge_base_path, "knowledge_data") # 默认分块后数据存储位置
+default_log_base_dir = os.path.join(knowledge_base_path, 'logs') # 默认分割数据时日志存储位置
+
 if not os.path.exists(default_knowledge_base_dir):
     os.makedirs(default_knowledge_base_dir)
 
+if not os.path.exists(default_log_base_dir):
+    os.makedirs(default_log_base_dir)
 
 app = FastAPI()
 
@@ -264,13 +275,22 @@ async def archive_file_knowledgebase(body: dict):
     code = files_status_manager.add_file(file_path, name, 'waitinglist')
     if code == 0:
         return {"code": 400, "msg": '该文库已经入库过', "data": {}}
-    MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value, name, file_path, chunk_size, file_name, -1))
+    MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value,
+                       name, # 知识库名称
+                       file_path,  # 文件路径
+                       chunk_size,  # 分块大小
+                       file_name,  # 文件名称
+                       -1,         # 起始位置
+                       '',        # 分块数据存储路径
+                       ''         # 日志位置
+                       ))
     return {"code": 200, "msg": 'ok', "data": {}}
 
 @app.post('/api/knowledgebase/archive_file_reload')
 async def archive_file_knowledgebase(body: dict):
     """
     文件重新入库
+    TODO 要验证之前的旧数据是否已经删除
     """
     name: str = body.get('name')
     file_path: str = body.get('file_path')
@@ -292,7 +312,15 @@ async def archive_file_knowledgebase(body: dict):
     if status in ('delete_failed', 'deleting'):
         return {'code': 400, 'msg': '删除失败或正在删除的文件，不能重新入库', 'data': {}}
     else:
-        MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value, name, file_path, chunk_size, None, -1))
+        MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value,
+                           name,
+                           file_path,
+                           chunk_size,
+                           None,
+                           -1,
+                           '',
+                           '',
+                           ))
         files_status_manager.update_file_status(file_path, name, 'waitinglist')
         return {"code": 200, "msg": 'ok', "data": {}}
 
@@ -310,7 +338,14 @@ async def delete_by_file(body: dict):
         return {'code': 400, 'msg': '正在删除中，不能重复删除'}
     if status in ('processed','failed', 'delete_failed'):
         files_status_manager.update_file_status(file_path, name, 'deleting')
-        MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value, name, file_path, 0, None, -1))
+        MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value,
+                           name,
+                           file_path,
+                           0,
+                           None,
+                           -1,
+                           '',
+                           ''))
         return {"code": 200, "msg": 'ok', "data": {}}
     else:
         return {'code': 400, 'msg': '正在入库的文件不能删除'}

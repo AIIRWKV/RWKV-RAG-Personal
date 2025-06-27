@@ -1,4 +1,5 @@
 ﻿# coding=utf-8
+import json
 
 from .abc import AbstractLoader, HtmlCommonLoader
 from .docx_loader import DocxLoader
@@ -8,6 +9,7 @@ from .markdown_loader import MarkdownLoader
 from .txt_loader import TxtLoader
 from .pdf_loader import PDFLoader
 from .internet_search import search_internet
+from src.utils.tools import calculate_string_md5
 
 
 import os
@@ -25,6 +27,7 @@ class Loader:
         self.chunk_size = chunk_size
         self.output_path = ''
         self.filename = filename # 用户自定义文件名
+
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File or Directory not found: {file_path}")
         if os.path.isdir(file_path):
@@ -57,6 +60,7 @@ class Loader:
 
 
     def load_and_split_file(self, output_dir: str):
+        # TODO  后续会支持多模态，应该要智能切割
         base_filename, file_ext = os.path.splitext(os.path.basename(self.file_path))
         if self.filename:
             base_filename = self.filename
@@ -79,13 +83,15 @@ class Loader:
             raise NotImplementedError(
                 "file type not supported yet(pdf, xlsx, docx, txt, markdown, html supported)")
         if func and callable(func):
-            output_file = os.path.join(output_dir, f"{base_filename}_chunks.txt")
+            output_file = os.path.join(output_dir, f"{base_filename}_chunked.jsonl")
             self.output_path = output_file
             with open(output_file, 'w', encoding='utf-8') as f:
                 for item in func():
                     if item:
-                        yield item
-                        f.write(item)
-                        f.write('\n')
+                        key = calculate_string_md5(item)
+                        yield (key, item)
+                        json_data = json.dumps({'key': key, 'text': item}, ensure_ascii=False)
+                        f.write(json_data)
+                        f.write("\n")
 
 

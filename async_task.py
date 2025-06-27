@@ -7,8 +7,8 @@ import json
 import os
 import atexit
 import time
-from datetime import date
-from typing import Union, List
+from datetime import date, datetime
+from typing import Union, List, Tuple
 from multiprocessing import Process
 
 import requests
@@ -16,11 +16,12 @@ import chromadb
 from chromadb import Collection
 
 from src.utils.sqlitedb import SqliteDB
-from src.utils.tools import calculate_string_md5
+from src.utils.tools import get_random_string
 from configuration import config as project_config, SERVER_PORT, AsyncTaskType, SQLITE_DB_PATH
 
 knowledge_base_path = project_config.config.get('knowledge_base_path')
-default_knowledge_base_dir = os.path.join(knowledge_base_path, "knowledge_data") # 默认联网知识的存储位置
+default_knowledge_base_dir = os.path.join(knowledge_base_path, "knowledge_data") # 默认分块后存储数据的位置
+default_log_base_dir = os.path.join(knowledge_base_path, 'logs') # 默认分割数据时日志存储位置
 vectordb_port = project_config.config.get("vectordb_port")
 
 
@@ -122,10 +123,11 @@ class IndexManager:
 
     @classmethod
     def add_texts(cls, collection: Collection,
-                  texts: List[str],
+                  texts: List[Tuple[str, str]],
                   embeddings: Union[List[List[float]]],
                   file_path: str):
-        keys = [calculate_string_md5(value) for value in texts]
+        keys = [value[0] for value in texts]
+        new_texts = [value[1] for value in texts]
         new_embeddings = embeddings   #[eb for eb in embeddings] # TODO 这一步是多余的吗
         if file_path:
             metadatas = [{'source': file_path} for _ in texts]
@@ -135,7 +137,7 @@ class IndexManager:
         collection.add(
             ids=keys,
             embeddings=new_embeddings,
-            documents=texts,
+            documents=new_texts,
             metadatas=metadatas
         )
         # index the value
@@ -158,57 +160,73 @@ def custom_do_loader(task:list):
     :return:
     """
     from src.diversefile import Loader
-    task_type, name, file_path, chunk_size, file_name, start_idx = task
+    task_type, name, file_path, chunk_size, file_name, start_idx, output_dir, log_file_path = task
     try:
         loader = Loader(file_path=file_path, chunk_size=chunk_size, filename=file_name)
     except:
         FileStatusManager.update_filestatus(name, file_path, 'failed')
         return False
     date_str = date.today().strftime("%Y%m%d")
-    output_dir = os.path.join(default_knowledge_base_dir, date_str)
+    if not output_dir:
+        output_dir = os.path.join(default_knowledge_base_dir, date_str)
+        task[6] = output_dir
+
+    log_output_dir = os.path.join(default_log_base_dir, date_str)
+    if not log_file_path:
+        log_file_path = os.path.join(log_output_dir, f'{get_random_string(10)}.log')
+        task[7] = log_file_path
+
+
+
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    FileStatusManager.update_filestatus(name, file_path, 'processing')
-    chunks = loader.load_and_split_file(output_dir)
-    success_num = 0
-    failed_num = 0
 
-    current_chunk_list = []
-    count = 0
-    batch_size = 20
-    try:
-        index_collection = IndexManager.get_collection(name)
-    except Exception as e:
-        FileStatusManager.update_filestatus(name, file_path, 'failed')
-        return False
-    for idx, chunk in enumerate(chunks):
-        if idx < start_idx:
-            continue
-        count += 1
-        current_chunk_list.append(chunk)
-        # 一次处理20个
-        if count % batch_size == 0:
+    if not os.path.exists(log_output_dir):
+        os.makedirs(log_output_dir)
+
+    with open(log_file_path, 'a', encoding='utf-8') as wf:
+        wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  开始处理文件：{file_path}")
+        FileStatusManager.update_filestatus(name, file_path, 'processing')
+        chunks = loader.load_and_split_file(output_dir)
+        success_num = 0
+        failed_num = 0
+
+        current_chunk_list = []
+        count = 0
+        batch_size = 20
+        try:
+            index_collection = IndexManager.get_collection(name)
+        except Exception as e:
+            FileStatusManager.update_filestatus(name, file_path, 'failed')
+            return False
+        for idx, chunk in enumerate(chunks):
+            if idx < start_idx:
+                continue
+            count += 1
+            current_chunk_list.append(chunk)
+            # 一次处理20个
+            if count % batch_size == 0:
+                try:
+                    embeddings = RWKVRAGClient.get_embedding(current_chunk_list)
+                except:
+                    failed_num += batch_size
+                    continue
+                try:
+                    IndexManager.add_texts(index_collection,current_chunk_list,embeddings, file_path)
+                    success_num += batch_size
+                except Exception as e:
+                    failed_num += batch_size
+                current_chunk_list = []
+                task[5] += batch_size
+
+        if current_chunk_list:
             try:
                 embeddings = RWKVRAGClient.get_embedding(current_chunk_list)
+                IndexManager.add_texts(index_collection, current_chunk_list, embeddings, file_path)
+                success_num += len(current_chunk_list)
             except:
-                failed_num += batch_size
-                continue
-            try:
-                IndexManager.add_texts(index_collection,current_chunk_list,embeddings, file_path)
-                success_num += batch_size
-            except Exception as e:
-                failed_num += batch_size
-            current_chunk_list = []
-            task[-1] += batch_size
-
-    if current_chunk_list:
-        try:
-            embeddings = RWKVRAGClient.get_embedding(current_chunk_list)
-            IndexManager.add_texts(index_collection, current_chunk_list, embeddings, file_path)
-            success_num += len(current_chunk_list)
-        except:
-            failed_num += len(current_chunk_list)
-        task[-1] += len(current_chunk_list)
+                failed_num += len(current_chunk_list)
+            task[5] += len(current_chunk_list)
 
     # # 记录文件入库状态
     if failed_num > 1.5 * success_num:
@@ -259,7 +277,7 @@ def custom_server():
             WAITING_ASYNC_TASK_QUEUE.extend(tasks)
             for i in range(len(WAITING_ASYNC_TASK_QUEUE)):
                 task = WAITING_ASYNC_TASK_QUEUE[i]
-                #task_type, name, file_path, chunk_size, file_name, idx = task
+                #task_type, name, file_path, chunk_size, file_name, idx, output_dir, log_file_path = task
                 task_type = task[0]
                 if task_type == AsyncTaskType.LOADER_DATA_BY_FILE.value:
                      # 这里用多进程的原因是处理文件时会加载各自第三方包，而有的包的会非常占用内存，但是任务处理完后，又不释放包的内存，
