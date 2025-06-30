@@ -1,5 +1,6 @@
 ﻿# coding=utf-8
 import re
+from typing import IO
 
 from docx import Document
 
@@ -19,13 +20,16 @@ class DocxLoader(AbstractLoader):
 
     def load(self):
         doc = Document(self.file_path)
-        new_lines = [self.__clean(page.text) for page in doc.paragraphs if page.text.strip()]
         current_txt = ''
-        for line in new_lines:
-            if len(current_txt) >= self.chunk_size:
+        #new_lines = [self.__clean(page.text) for page in doc.paragraphs if page.text.strip()]
+        for page in doc.paragraphs:
+            text = page.text
+            if text.strip():
+                line = self.__clean(text)
+                if len(current_txt) >= self.chunk_size:
+                    yield current_txt
+                    current_txt = ''
+                current_txt += ' ' + line
+            if current_txt:
                 yield current_txt
-                current_txt = ''
-            current_txt += ' ' + line
-        if current_txt:
-            yield current_txt
         del doc

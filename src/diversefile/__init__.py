@@ -1,5 +1,7 @@
 ﻿# coding=utf-8
 import json
+from typing import IO
+from datetime import datetime
 
 from .abc import AbstractLoader, HtmlCommonLoader
 from .docx_loader import DocxLoader
@@ -18,7 +20,7 @@ class Loader:
     """
     加载器，用来分割本地文件
     """
-    def __init__(self, file_path: str, chunk_size:int, filename: str=None):
+    def __init__(self, file_path: str, chunk_size:int, wf: IO, filename: str=None):
         """
         :param file_path: 文件路径或者目录地址
         :param chunk_size: 块大小
@@ -27,10 +29,13 @@ class Loader:
         self.chunk_size = chunk_size
         self.output_path = ''
         self.filename = filename # 用户自定义文件名
+        self.wf = wf # 日志句柄
 
         if not os.path.exists(file_path):
+            self.wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  原文件{file_path}不存在， 任务终止\n")
             raise FileNotFoundError(f"File or Directory not found: {file_path}")
         if os.path.isdir(file_path):
+            self.wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  {file_path}是目录，暂时不支持，任务终止\n")
             raise NotImplementedError("Directory is not supported yet")
 
     def load_txt(self):

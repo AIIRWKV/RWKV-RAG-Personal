@@ -1,6 +1,7 @@
 ﻿# coding=utf-8
 
 from abc import ABC, abstractmethod
+from typing import IO
 
 import readability
 import html_text

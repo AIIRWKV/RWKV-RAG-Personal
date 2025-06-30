@@ -83,18 +83,23 @@ class RWKVRAGClient:
 
 class FileStatusManager:
     @staticmethod
-    def update_filestatus(name: str, file_path: str, status: str):
+    def update_filestatus(name: str, file_path: str, fields: dict):
+        fields_sql = []
+        fields_params = []
+        for k, v in fields.items():
+            fields_sql.append(f"{k} = ?")
+            fields_params.append(v)
+        sql = (f"update file_status set {','.join(fields_sql)} ,last_updated = datetime('now', 'localtime') "
+               f"where collection_name = ? and file_path = ?")
         with SqliteDB(SQLITE_DB_PATH) as db:
-            db.execute(
-                f"update file_status set status = ?,last_updated = datetime('now', 'localtime') where collection_name = ? "
-                f"and file_path = ?", (status, name, file_path))
-            return db.rowcount
+           db.execute(sql, (*fields_params, name, file_path))
 
     @staticmethod
     def delete_filestatus(name: str, file_path: str):
         with SqliteDB(SQLITE_DB_PATH) as db:
             db.execute(f"delete from file_status where collection_name = ? and file_path = ?", (name, file_path))
             return db.rowcount
+
 
 
 class IndexManager:
@@ -161,11 +166,7 @@ def custom_do_loader(task:list):
     """
     from src.diversefile import Loader
     task_type, name, file_path, chunk_size, file_name, start_idx, output_dir, log_file_path = task
-    try:
-        loader = Loader(file_path=file_path, chunk_size=chunk_size, filename=file_name)
-    except:
-        FileStatusManager.update_filestatus(name, file_path, 'failed')
-        return False
+
     date_str = date.today().strftime("%Y%m%d")
     if not output_dir:
         output_dir = os.path.join(default_knowledge_base_dir, date_str)
@@ -185,8 +186,21 @@ def custom_do_loader(task:list):
         os.makedirs(log_output_dir)
 
     with open(log_file_path, 'a', encoding='utf-8') as wf:
-        wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  开始处理文件：{file_path}")
-        FileStatusManager.update_filestatus(name, file_path, 'processing')
+        wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  开始处理文件：{file_path}\n")
+        FileStatusManager.update_filestatus(name, file_path, {'status': 'processing'})
+        wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  检查向量数据库{name}集合是否存在\n")
+        try:
+            index_collection = IndexManager.get_collection(name)
+            wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  向量数据库{name}集合存在， 任务继续\n")
+        except Exception as e:
+            FileStatusManager.update_filestatus(name, file_path, {'status': 'failed'})
+            wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  向量数据库{name}集合不存在， 任务终止\n")
+            return False
+        try:
+            loader = Loader(file_path=file_path, chunk_size=chunk_size, wf=wf, filename=file_name)
+        except:
+            FileStatusManager.update_filestatus(name, file_path, {'status': 'failed'})
+            return False
         chunks = loader.load_and_split_file(output_dir)
         success_num = 0
         failed_num = 0
@@ -194,11 +208,7 @@ def custom_do_loader(task:list):
         current_chunk_list = []
         count = 0
         batch_size = 20
-        try:
-            index_collection = IndexManager.get_collection(name)
-        except Exception as e:
-            FileStatusManager.update_filestatus(name, file_path, 'failed')
-            return False
+
         for idx, chunk in enumerate(chunks):
             if idx < start_idx:
                 continue
@@ -206,23 +216,30 @@ def custom_do_loader(task:list):
             current_chunk_list.append(chunk)
             # 一次处理20个
             if count % batch_size == 0:
+                wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  获取{batch_size}个块数据块\n")
                 try:
                     embeddings = RWKVRAGClient.get_embedding(current_chunk_list)
+                    wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks successfully\n")
                 except:
                     failed_num += batch_size
+                    wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks failed\n")
                     continue
                 try:
                     IndexManager.add_texts(index_collection,current_chunk_list,embeddings, file_path)
+                    wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks successfully\n")
                     success_num += batch_size
                 except Exception as e:
                     failed_num += batch_size
+                    wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks failed\n")
                 current_chunk_list = []
                 task[5] += batch_size
 
         if current_chunk_list:
             try:
                 embeddings = RWKVRAGClient.get_embedding(current_chunk_list)
+                wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks successfully\n")
                 IndexManager.add_texts(index_collection, current_chunk_list, embeddings, file_path)
+                wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks successfully\n")
                 success_num += len(current_chunk_list)
             except:
                 failed_num += len(current_chunk_list)
@@ -230,9 +247,17 @@ def custom_do_loader(task:list):
 
     # # 记录文件入库状态
     if failed_num > 1.5 * success_num:
-        FileStatusManager.update_filestatus(name, file_path, 'failed')
+        FileStatusManager.update_filestatus(name, file_path, {'status': 'failed',
+                                                              'chunk_num': success_num,
+                                                              'chunked_file_path': loader.output_path,
+                                                              'chunked_log_file_path': log_file_path
+                                                              })
     else:
-        FileStatusManager.update_filestatus(name, file_path, 'processed')
+        FileStatusManager.update_filestatus(name, file_path, {'status': 'processed',
+                                                              'chunk_num': success_num,
+                                                              'chunked_file_path': loader.output_path,
+                                                              'chunked_log_file_path': log_file_path
+                                                              })
 
 def custom_delete_data_by_file_path(name: str, file_path: str):
     """
@@ -247,7 +272,7 @@ def custom_delete_data_by_file_path(name: str, file_path: str):
         FileStatusManager.delete_filestatus(name, file_path)
     except:
         # 删除失败
-        FileStatusManager.update_filestatus(name, file_path, 'delete_failed')
+        FileStatusManager.update_filestatus(name, file_path, {'status': 'delete_failed'})
 
 
 def custom_server():

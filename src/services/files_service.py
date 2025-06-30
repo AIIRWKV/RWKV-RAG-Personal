@@ -135,10 +135,14 @@ class FileStatusManager:
         """
         with SqliteDB(self.db_path) as db:
             if not keyword:
-                db.execute(f"select file_path, last_updated, status, chunk_num, chunk_method, is_used, chunked_file_path, chunked_log_file_path from {status_table_name} where collection_name = ? limit ? offset ?",
+                db.execute(f"select file_path, last_updated, status, chunk_num, chunk_method, is_used, "
+                           f"chunked_file_path, chunked_log_file_path from {status_table_name} "
+                           f"where collection_name = ? limit ? offset ?",
                        (collection_name, page_size, page * page_size - page_size))
             else:
-                db.execute(f"select file_path, last_updated, status , chunk_num, chunk_method, is_used, chunked_file_path, chunked_log_file_path from {status_table_name} where collection_name = ? and file_path like ? limit ? offset ?",
+                db.execute(f"select file_path, last_updated, status , chunk_num, chunk_method, is_used, "
+                           f"chunked_file_path, chunked_log_file_path from {status_table_name} "
+                           f"where collection_name = ? and file_path like ? limit ? offset ?",
                        (collection_name, '%'+keyword+'%', page_size, page * page_size - page_size))
             result = db.fetchall()
             return result
