@@ -98,6 +98,10 @@ class MilvusLiteManager(AbstractVectorDBManager, ABC):
             pass
         return True
 
+    def update(self, kwargs: dict):
+        # TODO 待完善
+        pass
+
     def search_nearby(self, kwargs: dict):
         collection_name = kwargs.get('collection_name')
         embeddings = kwargs.get('embeddings')

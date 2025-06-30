@@ -97,12 +97,31 @@ class AbstractVectorDBManager(ABC):
         pass
 
     @abstractmethod
+    def update(self, kwargs: dict):
+        """
+        更新数据，批量更新
+        :param kwargs:需要有以下值
+            collection_name： str， 集合名称
+            keys： List[str]，需要修改值的id
+            以下参数至少要有一个有：
+            embeddings: List[numpy.ndarray[numpy.float16]]，嵌入向量
+            texts： List[str]，文档
+            metadatas: List[dict], 元数据
+
+        :return:
+        """
+
+    @abstractmethod
     def search_nearby(self, kwargs: dict) -> list[str]:
         """
         搜索向量
         :param kwargs:必须有如下键：
             collection_name: str
             embeddings: List[numpy.ndarray[numpy.float16]]
+            metadata_field： dict, 元数据查找，元数据不是很多，且都是等于和不等于居多，这些格式是参照chromadb演化而来,以它的运算符为主
+                            {"name": ('$nin', [1,2,3]) # not in
+                             "price": ('$eq', 1)  # 等于1，
+                            }
         :return:
         """
         pass

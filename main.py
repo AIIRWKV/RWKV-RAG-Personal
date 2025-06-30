@@ -365,22 +365,31 @@ async def search_nearby(name: str, query: str, is_new:bool = False):
         return {"code": 400, "msg": '请选择知识库', "data": {}}
     embeddings = llm_service_worker.get_embeddings(
         {'texts': [query], "bgem3_path": project_config.default_embedding_path}) # List[numpy.ndarray[numpy.float16]]
+    not_used_sources = files_status_manager.get_not_used_source(name)
+    if not_used_sources:
+        cmd = {'collection_name': name, "embeddings": embeddings,
+               'metadata_field': {'source': ('$nin', not_used_sources)} }
+    else:
+        cmd = {'collection_name': name, "embeddings": embeddings, }
     try:
-        recall_data = index_service_worker.search_nearby(
-            {'collection_name': name, "embeddings": embeddings})
+        recall_data = index_service_worker.search_nearby(cmd)
     except Exception as e:
        return {"code": 400, "msg": "召回数据失败:%s" % str(e), "data": {}}
     documents = recall_data.get('documents', [])
     metadatas = recall_data.get('metadatas', []) or []
+    ids = recall_data.get('ids', [])
     if not metadatas:
         metadatas = [None] * len(documents)
     elif len(metadatas) < len(documents):
         metadatas.extend([None] * (len(documents) - len(metadatas)))
+    if not ids:
+        ids = [None] * len(documents)
     if documents:
         # 计算最佳匹配值
         cross_scores = llm_service_worker.get_cross_scores({"texts_0": documents,
                                                             "texts_1": [query for i in documents],
                                                             "rerank_path": project_config.default_rerank_path})
+        # TODO 优化，不应该是搞最佳匹配，而是重排序，然后选取几个资料做为上下文资料
         max_value, max_index = number_list_max(cross_scores)
         documents_metadata = [(documents[i], metadatas[i].get('source') if metadatas[i] and
                                                                            isinstance(metadatas[i], dict) else '')

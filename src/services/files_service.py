@@ -123,6 +123,20 @@ class FileStatusManager:
             else:
                 return 0, None
 
+    def get_not_used_source(self, collection_name):
+        """
+        获取没被启用的文件
+        :param collection_name:
+        :return:
+        """
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"select file_path from {status_table_name} where collection_name = ? and is_used = 0", (collection_name,))
+            result = db.fetchall()
+            if result:
+                return 1, [one[0] for one in result]
+            else:
+                return 0, []
+
     def update_file_status(self,file_path, collection_name, status):
         with SqliteDB(self.db_path) as db:
             db.execute(f"update {status_table_name} set status = ?,last_updated = datetime('now', 'localtime') where collection_name = ? "

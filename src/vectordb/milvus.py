@@ -82,9 +82,9 @@ class MilvusManager(AbstractVectorDBManager, ABC):
         client = self.client()
         new_embeddings = [eb for eb in embeddings] # TODO 这一步是多余的吗
         if file_path:
-            metadatas = [{'source': file_path} for _ in values]
+            metadatas = [{'source': file_path, 'is_active': 1} for _ in values]
         else:
-            metadatas = None
+            metadatas = [{'is_active': 1} for _ in values]
         try:
             collection = client.get_collection(collection_name)
         except:
@@ -111,6 +111,10 @@ class MilvusManager(AbstractVectorDBManager, ABC):
         except:
             pass
         return True
+
+    def update(self, kwargs: dict):
+        # TODO 待完善
+        pass
 
     def search_nearby(self, kwargs: dict):
         print(kwargs)

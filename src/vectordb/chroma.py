@@ -117,9 +117,9 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         client = self.client()
         new_embeddings = [eb for eb in embeddings] # TODO 这一步是多余的吗
         if file_path:
-            metadatas = [{'source': file_path} for _ in values]
+            metadatas = [{'source': file_path, 'is_active': 1} for _ in values]
         else:
-            metadatas = None
+            metadatas = [{'is_active': 1} for _ in values]
         try:
             collection = client.get_collection(collection_name)
         except:
@@ -147,18 +147,89 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
             pass
         return True
 
-    def search_nearby(self, kwargs: dict):
+    def update(self, kwargs: dict):
+        keys = kwargs.get("keys")
+        values = kwargs["texts"]
         collection_name = kwargs.get('collection_name')
         embeddings = kwargs.get('embeddings')
+        metadatas = kwargs.get('metadatas')
+        params = {}
+        if not isinstance(keys, list):
+            return  True # 不合法的数据，不处理，直接返回true
+        if values and isinstance(values, list):
+            params['documents'] = values
+        if embeddings and isinstance(embeddings, list):
+            params['embeddings'] = embeddings
+        if metadatas and isinstance(metadatas, list):
+            params['metadatas'] = metadatas
+        if not params:
+            return True
         client = self.client()
         try:
             collection = client.get_collection(collection_name)
         except:
             raise VectorDBCollectionNotExistError()
+        try:
+            collection.update(
+                ids=keys,
+                **params
+            )
+        except:
+            raise VectorDBError("update indexing failed")
+
+    @staticmethod
+    def __where_metadatas(metadata_field: dict):
+        """
+        :param metadata_field: {"name": ('$nin', [1,2,3]) # not in
+                             "price": ('$eq', 1)  # 等于1，
+                            }
+        :return:
+        """
+        if not metadata_field:
+            return None
+        op = {
+            "$eq": "$eq",
+            "$ne": "$ne",
+            "$gt": "$gt",
+            "$gte": "$gte",
+            "$lt": "$lt",
+            "$lte": "$lte",
+            "$in": "$in",
+            "$nin": "$nin",
+
+        }
+        if len(metadata_field) == 1:
+            key, values = list(metadata_field.items())[0]
+            if values[0] not in op:
+                return None
+            return {key: {op[values[0]]: values[1]}}
+        and_values = []
+        for key, values in metadata_field.items():
+            if values[0] not in op:
+                continue
+            and_values.append({key: {op[values[0]]: values[1]}})
+        if not and_values:
+            return None
+        return {"$and": and_values}
+
+    def search_nearby(self, kwargs: dict):
+        collection_name = kwargs.get('collection_name')
+        embeddings = kwargs.get('embeddings')
+        metadata_field = kwargs.get('metadata_field')
+        client = self.client()
+        try:
+            collection = client.get_collection(collection_name)
+        except:
+            raise VectorDBCollectionNotExistError()
+        where = self.__where_metadatas(metadata_field)
+
+
         search_result = collection.query(
             query_embeddings=embeddings,
             n_results=RECALL_NUMBER,
-            include=['documents', 'metadatas'])
+            where=where,
+            include=['documents', 'metadatas', 'ids']
+        )
         documents = search_result['documents']
         if documents:
             document = documents[0]
@@ -169,7 +240,7 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
             metadata = metadatas[0]
         else:
             metadata = []
-        return {'documents': document, 'metadatas': metadata}
+        return {'documents': document, 'metadatas': metadata, 'ids': search_result['ids']}
 
     def get_ids_by_metadatas(self, collection_name: str, where: dict, limit: int = 500, offset: int = 0):
         client = self.client()
