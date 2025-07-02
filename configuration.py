@@ -152,8 +152,8 @@ SQLITE_DB_PATH = os.path.join(config.config.get('knowledge_base_path',), 'files_
 
 
 class AsyncTaskType(Enum):
-    LOADER_DATA_BY_FILE = 1  #  切片数据
-    DELETE_DATA_BY_FILE = 2  # 删除数据
-
+    LOADER_DATA_BY_FILE = 1  #  数据切片
+    DELETE_DATA_BY_FILE = 2  # 删除向量数据量数据，并删除文件信息
+    DELETE_DATA_BY_FILE_FROM_VB = 3  # 删除向量数据量数据，但不删除文件信息
 
 MESSAGE_QUEUE = Queue()

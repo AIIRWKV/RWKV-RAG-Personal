@@ -131,6 +131,22 @@ class FileStatusManager:
             else:
                 return 0, None
 
+    def get_file_status_list(self, file_path_list, collection_name):
+        """
+        获取多个文件的状态
+        :param file_path_list:
+        :param collection_name:
+        :return:
+        """
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"select file_path,status from {status_table_name} where collection_name = ? "
+                       f"and file_path in ({','.join(['?'] * len(file_path_list))})", (collection_name, *file_path_list))
+            result = db.fetchall()
+            if result:
+                return 1, result
+            else:
+                return 0, []
+
     def get_not_used_source(self, collection_name):
         """
         获取没被启用的文件
@@ -149,6 +165,45 @@ class FileStatusManager:
         with SqliteDB(self.db_path) as db:
             db.execute(f"update {status_table_name} set status = ?,last_updated = datetime('now', 'localtime') where collection_name = ? "
                            f"and file_path = ?",(status,collection_name,file_path))
+            return db.rowcount
+
+    def batch_update_file_status(self, file_path_list, collection_name, status):
+        """
+        批量更新文件状态
+        :param file_path_list:
+        :param collection_name:
+        :param status:
+        :return:
+        """
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"update {status_table_name} set status = ?,last_updated = datetime('now', 'localtime') where collection_name = ? "
+                           f"and file_path in ({','.join(['?'] * len(file_path_list))})",(status,collection_name,*file_path_list))
+            return db.rowcount
+
+    def update_file_used_status(self, file_path, collection_name, is_used):
+        """
+        更改文件启用状态
+        :param file_path:
+        :param collection_name:
+        :param is_used:
+        :return:
+        """
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"update {status_table_name} set is_used = ?,last_updated = datetime('now', 'localtime') where collection_name = ? "
+                           f"and file_path = ?",(is_used,collection_name,file_path))
+            return db.rowcount
+
+    def batch_update_file_used_status(self, file_path_list, collection_name, is_used):
+        """
+        批量更改文件启用状态
+        :param file_path_list:
+        :param collection_name:
+        :param is_used:
+        :return:
+        """
+        with SqliteDB(self.db_path) as db:
+            db.execute(f"update {status_table_name} set is_used = ?,last_updated = datetime('now', 'localtime') where collection_name = ? "
+                           f"and file_path in ({','.join(['?'] * len(file_path_list))})",(is_used,collection_name,*file_path_list))
             return db.rowcount
 
     def get_collection_files(self, collection_name, page:int=1, page_size:int=100, keyword:str=None):

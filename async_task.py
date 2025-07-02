@@ -258,9 +258,10 @@ def custom_do_loader(task:list):
                                                               'chunked_log_file_path': log_file_path
                                                               })
 
-def custom_delete_data_by_file_path(name: str, file_path: str):
+def custom_delete_data_by_file_path(name: str, file_path: str, delete_filestatus: bool = True):
     """
     根据文件删除知识库
+    :param delete_filestatus:
     :param name:
     :param file_path:
     :return:
@@ -268,10 +269,14 @@ def custom_delete_data_by_file_path(name: str, file_path: str):
     # 删除向量数据库里的数据
     try:
         IndexManager.delete_texts(name, file_path=file_path)
-        FileStatusManager.delete_filestatus(name, file_path)
+        if delete_filestatus: # 当是重新入库的时候，只需删除向量数据库里数据，无需删除文件状态信息
+            FileStatusManager.delete_filestatus(name, file_path)
     except:
-        # 删除失败
-        FileStatusManager.update_filestatus(name, file_path, {'status': 'delete_failed'})
+        if delete_filestatus:
+            # 删除失败
+            FileStatusManager.update_filestatus(name, file_path, {'status': 'delete_failed'})
+        else:
+            FileStatusManager.update_filestatus(name, file_path, {'status': 'failed'})
 
 
 def custom_server():
@@ -308,13 +313,20 @@ def custom_server():
                      # 所以想到用多进程，处理完后，释放内存，避免出现有些包用的次数不多，但是用一次后又会长期占用内存的情况
                      p = Process(target=custom_do_loader, args=(task,))
                      p.start()
-                    #custom_do_loader(task)
+                     p.join()
                 elif task_type == AsyncTaskType.DELETE_DATA_BY_FILE.value:
                     name = task[1]
                     file_path = task[2]
-                    #custom_delete_data_by_file_path(name,file_path)
-                    p = Process(target=custom_delete_data_by_file_path, args=(name,file_path,))
+                    p = Process(target=custom_delete_data_by_file_path, args=(name,file_path, True))
                     p.start()
+                    p.join()
+                elif task_type == AsyncTaskType.DELETE_DATA_BY_FILE_FROM_VB.value:
+                    name = task[1]
+                    file_path = task[2]
+                    p = Process(target=custom_delete_data_by_file_path, args=(name,file_path, False))
+                    p.start()
+                    p.join()
+
                 WAITING_ASYNC_TASK_QUEUE[i] = None
             WAITING_ASYNC_TASK_QUEUE = []
         except:

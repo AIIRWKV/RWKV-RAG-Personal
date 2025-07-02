@@ -5,7 +5,7 @@
 import os
 from datetime import date, datetime
 
-
+from Cython.Shadow import returns
 from fastapi import APIRouter
 
 from api import default_knowledge_base_dir
@@ -110,7 +110,6 @@ async def archive_file_knowledgebase_again(body: dict):
     """
     文件重新入库，状态为切片完成或者切片失败的文件，都可以重新入数据集
 
-    TODO 要验证之前的旧数据是否已经删除
     """
     name: str = body.get('name')
     file_path: str = body.get('file_path')
@@ -132,15 +131,12 @@ async def archive_file_knowledgebase_again(body: dict):
     if status not in ('processed', 'failed'):
         return {'code': 400, 'msg': '只有处理完成或者处理失败的文件才能重新入库', 'data': {}}
     else:
+        # 删除向量数据库里旧数据
+        MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE_FROM_VB.value,
+                           name, file_path, chunk_size, None, -1, '', ''))
+        # 重新切片
         MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value,
-                           name,
-                           file_path,
-                           chunk_size,
-                           None,
-                           -1,
-                           '',
-                           '',
-                           ))
+                           name, file_path, chunk_size, None, -1, '', '',))
         files_status_manager.update_file_status(file_path, name, 'waitinglist')
         return {"code": 200, "msg": 'ok', "data": {}}
 
@@ -164,13 +160,7 @@ async def delete_by_file(body: dict):
     if status in ('processed','failed', 'delete_failed'):
         files_status_manager.update_file_status(file_path, name, 'deleting')
         MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value,
-                           name,
-                           file_path,
-                           0,
-                           None,
-                           -1,
-                           '',
-                           ''))
+                           name, file_path, 0, None, -1, '', ''))
         return {"code": 200, "msg": 'ok', "data": {}}
     else:
         return {'code': 400, 'msg': '正在入库的文件不能删除'}
@@ -188,24 +178,21 @@ async def batch_delete_by_file(body: dict):
     file_path_list: str = body.get('file_path_list')
     if not (name and file_path_list and isinstance(file_path_list, list) and isinstance(name, str)):
         return {"code": 400, "msg": '知识库名称和文件路径参数不合法', "data": {}}
-    # code, status = files_status_manager.get_file_status_info(file_path, name)
-    # if code == 0:
-    #     return {'code': 400, 'msg': '知识库里没有这个文件信息'}
-    # if status == 'deleting':
-    #     return {'code': 400, 'msg': '正在删除中，不能重复删除'}
-    # if status in ('processed', 'failed', 'delete_failed'):
-    #     files_status_manager.update_file_status(file_path, name, 'deleting')
-    #     MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value,
-    #                        name,
-    #                        file_path,
-    #                        0,
-    #                        None,
-    #                        -1,
-    #                        '',
-    #                        ''))
-    #     return {"code": 200, "msg": 'ok', "data": {}}
-    # else:
-    #     return {'code': 400, 'msg': '正在入库的文件不能删除'}
+    code, file_status_list = files_status_manager.get_file_status_list(file_path_list, name)
+    if code == 0:
+        return {'code': 400, 'msg': '知识库里没有这些文件信息'}
+    update_file_path_list = []
+    for file_path, status in file_status_list:
+        if status in ('processed', 'failed', 'delete_failed'):
+            update_file_path_list.append(file_path)
+            MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value,
+                               name, file_path, 0, None, -1, '', ''))
+    if update_file_path_list:
+        files_status_manager.batch_update_file_status(update_file_path_list, name, 'deleting')
+        return {"code": 200, "msg": 'ok', "data": {}}
+    else:
+        return {'code': 400, 'msg': '正在入库的文件不能删除'}
+
 
 
 @router.post('/knowledge/active_file')
@@ -218,6 +205,11 @@ async def active_file(body: dict):
     name: str = body.get('name')
     file_path: str = body.get('file_path')
 
+    if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
+    files_status_manager.update_file_used_status(file_path, name, 1)
+    return {"code": 200, "msg": 'ok', "data": {}}
+
 
 @router.post('/knowledge/batch_active_file')
 async def batch_active_file(body: dict):
@@ -228,6 +220,10 @@ async def batch_active_file(body: dict):
     """
     name: str = body.get('name')
     file_path_list: str = body.get('file_path_list')
+    if not (name and file_path_list and isinstance(file_path_list, list) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径参数不合法', "data": {}}
+    files_status_manager.batch_update_file_used_status(file_path_list, name, 1)
+    return {"code": 200, "msg": 'ok', "data": {}}
 
 
 @router.post('/knowledge/disable_file')
@@ -240,6 +236,11 @@ async def disable_file(body: dict):
     name: str = body.get('name')
     file_path: str = body.get('file_path')
 
+    if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
+    files_status_manager.update_file_used_status(file_path, name, 0)
+    return {"code": 200, "msg": 'ok', "data": {}}
+
 
 @router.post('/knowledge/batch_disable_file')
 async def batch_disable_file(body: dict):
@@ -250,6 +251,10 @@ async def batch_disable_file(body: dict):
     """
     name: str = body.get('name')
     file_path_list: str = body.get('file_path_list')
+    if not (name and file_path_list and isinstance(file_path_list, list) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径参数不合法', "data": {}}
+    files_status_manager.batch_update_file_used_status(file_path_list, name, 0)
+    return {"code": 200, "msg": 'ok', "data": {}}
 
 
 @router.post('/knowledge/cancel_file')
