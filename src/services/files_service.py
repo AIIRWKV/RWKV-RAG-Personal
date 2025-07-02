@@ -11,7 +11,8 @@ create_status_table_sql = ("create table if not exists file_status "
                            "status text, " # 解析状态
                            "last_updated text NULL, " # 最后更新时间
                            "chunk_num INTEGER DEFAULT 0," # 分块数
-                           "chunk_method text DEFAULT 'General'," # 切片方法
+                           "chunk_method text DEFAULT 'General'," # 切片方法名称
+                           "chunk_method_detail text DEFAULT NULL ," # 具体的切片方法
                            "is_used INTEGER DEFAULT 1,"  # 是否启用
                            "chunked_file_path text ,"  # 切片后文件路径
                            "chunked_log_file_path text," # 切片后日志路径
@@ -50,8 +51,15 @@ create_chat_history_table_sql_list = ['create table if not exists chat_history_0
 #                                       'create table if not exists file_chunk_3 (id text PRIMARY KEY, file_name text not null)',
 #                                       'create table if not exists file_chunk_4 (id text PRIMARY KEY, file_name text not null)']
 
-
-valid_status = ['unprocess', 'waitinglist','processing','processed','failed', 'deleting','delete_failed']
+# 文件分块处理状态
+valid_status = ['unprocess', # 未处理
+                'waitinglist', # 等待处理
+                'processing', # 处理中
+                'processed',  # 处理完成
+                'failed',  # 处理失败
+                'deleting', # 删除中
+                'delete_failed'  # 删除失败
+                ]
 
 
 

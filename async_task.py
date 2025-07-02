@@ -2,6 +2,7 @@
 """
 异步任务
 """
+import copy
 import sys
 import json
 import os
@@ -12,21 +13,28 @@ from typing import Union, List, Tuple
 from multiprocessing import Process
 
 import requests
-import chromadb
-from chromadb import Collection
 
 from src.utils.sqlitedb import SqliteDB
 from src.utils.tools import get_random_string
-from configuration import config as project_config, SERVER_PORT, AsyncTaskType, SQLITE_DB_PATH
+from configuration import (
+    config as project_config,
+    SERVER_PORT, AsyncTaskType,
+    SQLITE_DB_PATH)
+from src.services.index_service import ServiceWorker as IndexServiceWorker
 
-knowledge_base_path = project_config.config.get('knowledge_base_path')
+
+local_project_config = copy.deepcopy(project_config.config)
+local_project_config['just_need_client'] =  True
+print(local_project_config, '   ppppppp')
+
+knowledge_base_path = local_project_config.get('knowledge_base_path')
 default_knowledge_base_dir = os.path.join(knowledge_base_path, "knowledge_data") # 默认分块后存储数据的位置
 default_log_base_dir = os.path.join(knowledge_base_path, 'logs') # 默认分割数据时日志存储位置
-vectordb_port = project_config.config.get("vectordb_port")
+index_client_worker = IndexServiceWorker(local_project_config)
 
 
 API_HOST = f"http://127.0.0.1:{SERVER_PORT}"
-_sqlite_db_path = os.path.join(project_config.config.get('knowledge_base_path',), 'files_services.db')
+_sqlite_db_path = os.path.join(local_project_config.get('knowledge_base_path',), 'files_services.db')
 
 WAITING_ASYNC_TASK_QUEUE = []
 
@@ -103,55 +111,46 @@ class FileStatusManager:
 
 
 class IndexManager:
-    client = None
 
     @classmethod
-    def get_client(cls):
-        if cls.client is None:
-            try:
-                _client = chromadb.HttpClient(host='127.0.0.1', port=vectordb_port)
-                cls.client = _client
-            except Exception as e:
-                raise ValueError('连接Chroma服务失败')
-        else:
-            _client = cls.client
-        return _client
-
-    @classmethod
-    def get_collection(cls, name:str):
-        client = cls.get_client()
-        try:
-            collection = client.get_collection(name)
-        except:
-            raise ValueError(f'知识库{name}不存在')
-        return collection
-
-    @classmethod
-    def add_texts(cls, collection: Collection,
+    def add_texts(cls, name: str,
                   texts: List[Tuple[str, str]],
                   embeddings: Union[List[List[float]]],
-                  file_path: str):
+                  file_path: str
+                  ):
+        """
+
+        :param name: 数据集名称
+        :param texts: 文本[(id1, txt1), (id2, text2)]
+        :param embeddings: 嵌入向量
+        :param file_path: 文件的路径
+        :return:
+        """
         keys = [value[0] for value in texts]
         new_texts = [value[1] for value in texts]
         new_embeddings = embeddings   #[eb for eb in embeddings] # TODO 这一步是多余的吗
-        if file_path:
-            metadatas = [{'source': file_path} for _ in texts]
-        else:
-            metadatas = None
-
-        collection.add(
-            ids=keys,
-            embeddings=new_embeddings,
-            documents=new_texts,
-            metadatas=metadatas
-        )
-        # index the value
+        cmd = {"keys": keys,
+               "texts": new_texts,
+               "embeddings": new_embeddings,
+               'collection_name': name,
+               'file_path': file_path
+               }
+        index_client_worker.index_texts(cmd)
         return True
 
     @classmethod
-    def delete_texts(cls, name: str, file_path: str):
-        collection = cls.get_collection(name)
-        collection.delete(where={'source': file_path})
+    def delete_texts(cls, name: str,
+                     keys: List[str] = None,
+                     file_path: str = None
+                     ):
+        cmd = {
+            "keys": keys,
+            "collection_name": name,
+            "metadatas": {"source": file_path}
+
+        }
+        index_client_worker.delete(cmd)
+        return True
 
 
 def custom_do_loader(task:list):
@@ -190,7 +189,7 @@ def custom_do_loader(task:list):
         FileStatusManager.update_filestatus(name, file_path, {'status': 'processing'})
         wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  检查向量数据库{name}集合是否存在\n")
         try:
-            index_collection = IndexManager.get_collection(name)
+
             wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  向量数据库{name}集合存在， 任务继续\n")
         except Exception as e:
             FileStatusManager.update_filestatus(name, file_path, {'status': 'failed'})
@@ -218,14 +217,14 @@ def custom_do_loader(task:list):
             if count % batch_size == 0:
                 wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  获取{batch_size}个块数据块\n")
                 try:
-                    embeddings = RWKVRAGClient.get_embedding(current_chunk_list)
+                    embeddings = RWKVRAGClient.get_embedding([line[1] for line in current_chunk_list])
                     wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks successfully\n")
                 except:
                     failed_num += batch_size
                     wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks failed\n")
                     continue
                 try:
-                    IndexManager.add_texts(index_collection,current_chunk_list,embeddings, file_path)
+                    IndexManager.add_texts(name, current_chunk_list, embeddings, file_path)
                     wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks successfully\n")
                     success_num += batch_size
                 except Exception as e:
@@ -236,9 +235,9 @@ def custom_do_loader(task:list):
 
         if current_chunk_list:
             try:
-                embeddings = RWKVRAGClient.get_embedding(current_chunk_list)
+                embeddings = RWKVRAGClient.get_embedding([line[1] for line in current_chunk_list])
                 wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks successfully\n")
-                IndexManager.add_texts(index_collection, current_chunk_list, embeddings, file_path)
+                IndexManager.add_texts(name, current_chunk_list, embeddings, file_path)
                 wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks successfully\n")
                 success_num += len(current_chunk_list)
             except:
@@ -268,7 +267,7 @@ def custom_delete_data_by_file_path(name: str, file_path: str):
     """
     # 删除向量数据库里的数据
     try:
-        IndexManager.delete_texts(name, file_path)
+        IndexManager.delete_texts(name, file_path=file_path)
         FileStatusManager.delete_filestatus(name, file_path)
     except:
         # 删除失败

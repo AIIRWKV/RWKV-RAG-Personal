@@ -2,7 +2,7 @@ import time
 from multiprocessing import Lock
 
 
-from src.services import AbstractServiceWorker
+from src.services.abc import AbstractServiceWorker
 from src.vectordb import VectorDBError
 from src.vectordb import INIT_VECTORDB_COLLECTION_NAME
 from src.vectordb import get_vectordb_manager
@@ -18,9 +18,12 @@ class ServiceWorker(AbstractServiceWorker):
         self.vectordb_port = config.get("vectordb_port")
         self.vectordb_host =config.get("vectordb_host", )
         self.vectordb_path = config.get("vectordb_path")
+
+        # 控制管理器只作为客户端相关操作，不做服务端相关操作（比如初始化数据，启动向量数据库服务等）
+        self.just_need_client = config.get("just_need_client", False)
+
         self.vectordb_manager = None  # 管理器
         self.init_once()
-        self.init_vectordb_db()
 
 
     def init_vectordb_db(self):
@@ -38,13 +41,15 @@ class ServiceWorker(AbstractServiceWorker):
                 self.lock.release()
 
     def init_once(self):
-        # 启动本地向量数据库服务
         Manager = get_vectordb_manager(self.vectordb_name)
         if not Manager:
             raise VectorDBError(f'暂时不支持向量数据库类型:{self.vectordb_name}')
         self.vectordb_manager = Manager(self.vectordb_path, self.vectordb_port, self.vectordb_host)
-        self.vectordb_manager.run()
-        time.sleep(5)
+        if not self.just_need_client:
+            # 启动本地向量数据库服务
+            self.vectordb_manager.run()
+            time.sleep(5)
+            self.init_vectordb_db()
 
     def index_texts(self, cmd: dict):
         return self.vectordb_manager.add(cmd)
@@ -68,7 +73,8 @@ class ServiceWorker(AbstractServiceWorker):
        return self.vectordb_manager.search_nearby(cmd)
 
     def delete(self, cmd: dict):
-        return self.vectordb_manager.delete(keys=cmd.get('keys', []), collection_name=cmd.get('collection_name'))
+        return self.vectordb_manager.delete(keys=cmd.get('keys', []), collection_name=cmd.get('collection_name'),
+                                            metadatas=cmd.get('metadatas'))
 
     def get_ids_by_metadatas(self, cmd: dict):
         return self.vectordb_manager.get_ids_by_metadatas(collection_name=cmd.get('collection_name'),

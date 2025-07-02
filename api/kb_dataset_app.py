@@ -9,9 +9,9 @@ from datetime import date, datetime
 from fastapi import APIRouter
 
 from api import default_knowledge_base_dir
-from src.services import (index_service_worker,
-                          #llm_service_worker,
-                          files_status_manager)
+from api import (index_service_worker,
+                #llm_service_worker,
+                files_status_manager)
 from src.utils.tools import (get_random_string,
                              )
 from configuration import (config as project_config,
@@ -24,7 +24,7 @@ router = APIRouter(tags=["数据集"])
 @router.post('/knowledgebase/archive_text')
 async def archive_text_knowledgebase(body: dict):
     """
-    手动输入知识入库
+    手动输入知识
     """
     name = body.get('name')
     text = body.get('text')
@@ -106,9 +106,10 @@ async def archive_file_knowledgebase(body: dict):
     return {"code": 200, "msg": 'ok', "data": {}}
 
 @router.post('/knowledgebase/archive_file_reload')
-async def archive_file_knowledgebase(body: dict):
+async def archive_file_knowledgebase_again(body: dict):
     """
-    文件重新入库
+    文件重新入库，状态为切片完成或者切片失败的文件，都可以重新入数据集
+
     TODO 要验证之前的旧数据是否已经删除
     """
     name: str = body.get('name')
@@ -128,8 +129,8 @@ async def archive_file_knowledgebase(body: dict):
     if code == 0:
         return {"code": 400, "msg": '该文库已经入库过', "data": {}}
 
-    if status in ('delete_failed', 'deleting'):
-        return {'code': 400, 'msg': '删除失败或正在删除的文件，不能重新入库', 'data': {}}
+    if status not in ('processed', 'failed'):
+        return {'code': 400, 'msg': '只有处理完成或者处理失败的文件才能重新入库', 'data': {}}
     else:
         MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value,
                            name,
@@ -147,7 +148,7 @@ async def archive_file_knowledgebase(body: dict):
 @router.post('/knowledge/delete_by_file')
 async def delete_by_file(body: dict):
     """
-    删除某个文件
+    删除数据集某个文件
     :param body:
     :return:
     """
@@ -173,3 +174,101 @@ async def delete_by_file(body: dict):
         return {"code": 200, "msg": 'ok', "data": {}}
     else:
         return {'code': 400, 'msg': '正在入库的文件不能删除'}
+
+
+@router.post('/knowledge/batch_delete_by_file')
+async def batch_delete_by_file(body: dict):
+    """
+    删除数据集里多个文件
+    :param body:
+    :return:
+    """
+
+    name: str = body.get('name')
+    file_path_list: str = body.get('file_path_list')
+    if not (name and file_path_list and isinstance(file_path_list, list) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径参数不合法', "data": {}}
+    # code, status = files_status_manager.get_file_status_info(file_path, name)
+    # if code == 0:
+    #     return {'code': 400, 'msg': '知识库里没有这个文件信息'}
+    # if status == 'deleting':
+    #     return {'code': 400, 'msg': '正在删除中，不能重复删除'}
+    # if status in ('processed', 'failed', 'delete_failed'):
+    #     files_status_manager.update_file_status(file_path, name, 'deleting')
+    #     MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value,
+    #                        name,
+    #                        file_path,
+    #                        0,
+    #                        None,
+    #                        -1,
+    #                        '',
+    #                        ''))
+    #     return {"code": 200, "msg": 'ok', "data": {}}
+    # else:
+    #     return {'code': 400, 'msg': '正在入库的文件不能删除'}
+
+
+@router.post('/knowledge/active_file')
+async def active_file(body: dict):
+    """
+    启用数据集里某个文件
+    :param body:
+    :return:
+    """
+    name: str = body.get('name')
+    file_path: str = body.get('file_path')
+
+
+@router.post('/knowledge/batch_active_file')
+async def batch_active_file(body: dict):
+    """
+    启用数据集里多个文件
+    :param body:
+    :return:
+    """
+    name: str = body.get('name')
+    file_path_list: str = body.get('file_path_list')
+
+
+@router.post('/knowledge/disable_file')
+async def disable_file(body: dict):
+    """
+    禁用数据集里某个文件
+    :param body:
+    :return:
+    """
+    name: str = body.get('name')
+    file_path: str = body.get('file_path')
+
+
+@router.post('/knowledge/batch_disable_file')
+async def batch_disable_file(body: dict):
+    """
+    禁用数据集里多个文件
+    :param body:
+    :return:
+    """
+    name: str = body.get('name')
+    file_path_list: str = body.get('file_path_list')
+
+
+@router.post('/knowledge/cancel_file')
+async def cancel_file(body: dict):
+    """
+    取消数据集里某个waitinglist状态的文件chunking的入库
+    :param body:
+    :return:
+    """
+    name: str = body.get('name')
+    file_path: str = body.get('file_path')
+
+
+@router.post('/knowledge/batch_cancel_file')
+async def batch_cancel_file(body: dict):
+    """
+    取消数据集里多个waitinglist状态的文件chunking的入库
+    :param body:
+    :return:
+    """
+    name: str = body.get('name')
+    file_path_list: str = body.get('file_path_list')

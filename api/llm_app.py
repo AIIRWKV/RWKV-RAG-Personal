@@ -8,8 +8,8 @@ from datetime import datetime
 
 from fastapi import APIRouter
 
-from src.services import (index_service_worker,
-                          files_status_manager)
+from api import (index_service_worker,
+                 files_status_manager)
 from configuration import config as project_config
 
 

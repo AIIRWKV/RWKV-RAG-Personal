@@ -8,7 +8,7 @@ import torch
 from FlagEmbedding import FlagReranker, BGEM3FlagModel
 from rwkv.utils import PIPELINE, PIPELINE_ARGS
 
-from src.services import AbstractServiceWorker
+from src.services.abc import AbstractServiceWorker
 from configuration import config
 
 os.environ['RWKV_JIT_ON'] = '1'

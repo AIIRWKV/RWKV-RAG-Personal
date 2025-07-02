@@ -133,8 +133,23 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         # index the value
         return True
 
-    def delete(self, keys: List[str], collection_name: str):
-        if not keys:
+    def delete(self, keys: List[str], collection_name: str, metadatas: dict=None):
+        # keys 和 metadatas 至少一个不能为空
+        params = {}
+        if keys:
+            params['ids'] = keys
+        if metadatas and isinstance(metadatas, dict):
+            key_list = list(metadatas.keys())
+            if len(key_list) == 1:
+                where = {key_list[0]: metadatas[key_list[0]]}
+            else:
+                tmp = []
+                for key in key_list:
+                    tmp.append({key: metadatas[key]})
+                where = {"$and": tmp}
+            params['where'] = where
+
+        if not params:
             return True
         client = self.client()
         try:
@@ -142,7 +157,7 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         except:
             raise VectorDBCollectionNotExistError()
         try:
-            collection.delete(ids=keys)
+            collection.delete(**params)
         except:
             pass
         return True

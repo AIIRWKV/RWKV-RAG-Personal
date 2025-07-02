@@ -66,6 +66,6 @@ async def internet_search(query: str, deepsearch=False, search_engine_name='baid
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"  # 禁用代理缓冲[2](@ref)
+            "X-Accel-Buffering": "no"
         }
     )

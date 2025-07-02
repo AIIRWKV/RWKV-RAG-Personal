@@ -88,7 +88,7 @@ class AbstractVectorDBManager(ABC):
         """
         pass
 
-    def delete(self, keys: List[str], collection_name: str):
+    def delete(self, keys: List[str], collection_name: str, metadatas: dict=None):
         """
         删除向量
         :param kwargs:

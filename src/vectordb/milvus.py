@@ -98,7 +98,8 @@ class MilvusManager(AbstractVectorDBManager, ABC):
         # index the value
         return True
 
-    def delete(self, keys: List[str], collection_name: str):
+    def delete(self, keys: List[str], collection_name: str, metadatas: dict=None):
+        # TODO 待支持metadatas条件删除
         if not keys:
             return True
         client = self.client()
