@@ -11,7 +11,6 @@ from .markdown_loader import MarkdownLoader
 from .txt_loader import TxtLoader
 from .pdf_loader import PDFLoader
 from .internet_search import search_internet
-from src.utils.tools import calculate_string_md5
 
 
 import os
@@ -90,13 +89,14 @@ class Loader:
         if func and callable(func):
             output_file = os.path.join(output_dir, f"{base_filename}_chunked.jsonl")
             self.output_path = output_file
-            with open(output_file, 'w', encoding='utf-8') as f:
-                for item in func():
-                    if item:
-                        key = calculate_string_md5(item)
-                        yield (key, item)
-                        json_data = json.dumps({'key': key, 'text': item}, ensure_ascii=False)
-                        f.write(json_data)
-                        f.write("\n")
+            # with open(output_file, 'w', encoding='utf-8') as f:
+            for item in func():
+                if item:
+                        # key = calculate_string_md5(item)
+                        #yield (key, item)
+                        yield item
+                        # json_data = json.dumps({'key': key, 'text': item}, ensure_ascii=False)
+                        # f.write(json_data)
+                        # f.write("\n")
 
 

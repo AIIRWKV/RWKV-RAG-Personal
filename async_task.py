@@ -13,6 +13,7 @@ from typing import Union, List, Tuple
 from multiprocessing import Process
 
 import requests
+from pybloom_live import BloomFilter
 
 from src.utils.sqlitedb import SqliteDB
 from src.utils.tools import get_random_string
@@ -21,11 +22,11 @@ from configuration import (
     SERVER_PORT, AsyncTaskType,
     SQLITE_DB_PATH)
 from src.services.index_service import ServiceWorker as IndexServiceWorker
+from src.utils.tools import calculate_string_md5
 
 
 local_project_config = copy.deepcopy(project_config.config)
 local_project_config['just_need_client'] =  True
-print(local_project_config, '   ppppppp')
 
 knowledge_base_path = local_project_config.get('knowledge_base_path')
 default_knowledge_base_dir = os.path.join(knowledge_base_path, "knowledge_data") # 默认分块后存储数据的位置
@@ -37,6 +38,7 @@ API_HOST = f"http://127.0.0.1:{SERVER_PORT}"
 _sqlite_db_path = os.path.join(local_project_config.get('knowledge_base_path',), 'files_services.db')
 
 WAITING_ASYNC_TASK_QUEUE = []
+NOW_LOADER_DATA = None  # 当前正在切片的文件信息
 
 
 class RWKVRAGClient:
@@ -119,6 +121,23 @@ class FileStatusManager:
             else:
                 return 0, None
 
+    @staticmethod
+    def get_chunk_info(name: str, file_path: str):
+        """
+        获取分片数据基本信息
+        :param name:
+        :param file_path:
+        :return:
+        """
+        with SqliteDB(SQLITE_DB_PATH) as db:
+            db.execute(f"select chunked_file_path,chunked_log_file_path from file_status where collection_name = ? "
+                       f"and file_path = ?", (name, file_path))
+            result = db.fetchone()
+            if result:
+                return 1, {'chunked_file_path': result[0], 'chunked_log_file_path': result[1]}
+            else:
+                return 0, {}
+
 
 
 class IndexManager:
@@ -163,6 +182,44 @@ class IndexManager:
         index_client_worker.delete(cmd)
         return True
 
+def record_loader_info(name, file_path, output_file_path, log_file_path):
+    """
+    记录入库状态
+    :param name:
+    :param file_path:
+    :param output_file_path:
+    :param log_file_path:
+    :return:
+    """
+    # 对output_file_path进行去重，保证数据的唯一性和准确性
+    total = 0
+    new_output_file_path = output_file_path + '.done'
+    with open(output_file_path, 'r', encoding='utf-8') as rf, open(new_output_file_path, 'w', encoding='utf-8') as wf:
+        bf = BloomFilter(capacity=20000000, error_rate=0.0001)
+        for line in rf:
+            try:
+                obj = json.loads(line)
+                key = obj['key']
+                if key not in bf:
+                    wf.write(line)
+                    bf.add(key)
+                    total += 1
+            except:
+                continue
+
+    if total == 0:
+        FileStatusManager.update_filestatus(name, file_path, {'status': 'failed',
+                                                              'chunk_num': total,
+                                                              'chunked_file_path': new_output_file_path,
+                                                              'chunked_log_file_path': log_file_path
+                                                              })
+    else:
+        FileStatusManager.update_filestatus(name, file_path, {'status': 'processed',
+                                                              'chunk_num': total,
+                                                              'chunked_file_path': new_output_file_path,
+                                                              'chunked_log_file_path': log_file_path
+                                                              })
+    os.remove(output_file_path)
 
 def custom_do_loader(task:list):
     """
@@ -175,6 +232,7 @@ def custom_do_loader(task:list):
     :return:
     """
     from src.diversefile import Loader
+    global NOW_LOADER_DATA
     task_type, name, file_path, chunk_size, file_name, start_idx, output_dir, log_file_path = task
 
     date_str = date.today().strftime("%Y%m%d")
@@ -216,63 +274,66 @@ def custom_do_loader(task:list):
         except:
             FileStatusManager.update_filestatus(name, file_path, {'status': 'failed'})
             return False
-        chunks = loader.load_and_split_file(output_dir)
-        success_num = 0
-        failed_num = 0
 
-        current_chunk_list = []
+        chunks = loader.load_and_split_file(output_dir)
+
+        current_chunk_list :List[str] = []
         count = 0
         batch_size = 20
 
-        for idx, chunk in enumerate(chunks):
-            if idx < start_idx:
-                continue
-            count += 1
-            current_chunk_list.append(chunk)
-            # 一次处理20个
-            if count % batch_size == 0:
-                wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  获取{batch_size}个块数据块\n")
-                try:
-                    embeddings = RWKVRAGClient.get_embedding([line[1] for line in current_chunk_list])
-                    wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks successfully\n")
-                except:
-                    failed_num += batch_size
-                    wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks failed\n")
+        output_file_path = loader.output_path
+        if not output_file_path:
+            base_filename, file_ext = os.path.splitext(os.path.basename(file_path))
+            if file_name:
+                base_filename = file_name
+            output_file_path = os.path.join(output_dir, f"{base_filename}_chunked.jsonl")
+        NOW_LOADER_DATA = (name, file_name, output_file_path, log_file_path)
+        with open(output_file_path, 'a', encoding='utf-8') as chunk_wf:
+
+            for idx, chunk in enumerate(chunks):
+                if idx < start_idx:
                     continue
+                count += 1
+                current_chunk_list.append(chunk)
+                # 一次处理20个
+                if count % batch_size == 0:
+                    wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  获取{batch_size}个块数据块\n")
+                    try:
+                        embeddings = RWKVRAGClient.get_embedding(current_chunk_list)
+                        wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks successfully\n")
+                    except:
+                        wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks failed\n")
+                        continue
+                    try:
+                        new_current_chunk_list = [(calculate_string_md5(line), line) for line in current_chunk_list]
+                        IndexManager.add_texts(name, new_current_chunk_list, embeddings, file_path)
+                        wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks successfully\n")
+                        for key, line in new_current_chunk_list:
+                            json_data = json.dumps({'key': key, 'text': line}, ensure_ascii=False)
+                            chunk_wf.write(json_data + '\n')
+
+                    except Exception as e:
+                        wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks failed\n")
+                    current_chunk_list = []
+                    task[5] += batch_size
+
+            if current_chunk_list:
                 try:
-                    IndexManager.add_texts(name, current_chunk_list, embeddings, file_path)
+                    embeddings = RWKVRAGClient.get_embedding(current_chunk_list)
+                    wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks successfully\n")
+                    new_current_chunk_list = [(calculate_string_md5(line), line) for line in current_chunk_list]
+                    IndexManager.add_texts(name, new_current_chunk_list, embeddings, file_path)
                     wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks successfully\n")
-                    success_num += batch_size
-                except Exception as e:
-                    failed_num += batch_size
-                    wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks failed\n")
-                current_chunk_list = []
-                task[5] += batch_size
+                    for key, line in new_current_chunk_list:
+                        json_data = json.dumps({'key': key, 'text': line}, ensure_ascii=False)
+                        chunk_wf.write(json_data + '\n')
+                except:
+                    pass
+                task[5] += len(current_chunk_list)
 
-        if current_chunk_list:
-            try:
-                embeddings = RWKVRAGClient.get_embedding([line[1] for line in current_chunk_list])
-                wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Embedding chunks successfully\n")
-                IndexManager.add_texts(name, current_chunk_list, embeddings, file_path)
-                wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  Indexing chunks successfully\n")
-                success_num += len(current_chunk_list)
-            except:
-                failed_num += len(current_chunk_list)
-            task[5] += len(current_chunk_list)
-
-    # # 记录文件入库状态
-    if failed_num > 1.5 * success_num:
-        FileStatusManager.update_filestatus(name, file_path, {'status': 'failed',
-                                                              'chunk_num': success_num,
-                                                              'chunked_file_path': loader.output_path,
-                                                              'chunked_log_file_path': log_file_path
-                                                              })
-    else:
-        FileStatusManager.update_filestatus(name, file_path, {'status': 'processed',
-                                                              'chunk_num': success_num,
-                                                              'chunked_file_path': loader.output_path,
-                                                              'chunked_log_file_path': log_file_path
-                                                              })
+    # 记录文件入库状态
+    record_loader_info(name, file_path, output_file_path, log_file_path)
+    NOW_LOADER_DATA = None
 
 def custom_delete_data_by_file_path(name: str, file_path: str, delete_filestatus: bool = True):
     """
@@ -283,10 +344,12 @@ def custom_delete_data_by_file_path(name: str, file_path: str, delete_filestatus
     :return:
     """
     # 删除向量数据库里的数据
+    is_delete_ok = False
     try:
         IndexManager.delete_texts(name, file_path=file_path)
         if delete_filestatus: # 当是重新入库的时候，只需删除向量数据库里数据，无需删除文件状态信息
             FileStatusManager.delete_filestatus(name, file_path)
+        is_delete_ok = True
     except:
         if delete_filestatus:
             # 删除失败
@@ -294,6 +357,24 @@ def custom_delete_data_by_file_path(name: str, file_path: str, delete_filestatus
         else:
             FileStatusManager.update_filestatus(name, file_path, {'status': 'failed'})
 
+    if is_delete_ok:
+
+        # 删除切片文件路径和日志路径
+        _, chunk_file_info = FileStatusManager.get_chunk_info(name, file_path)
+        if chunk_file_info:
+            chunked_file_path = chunk_file_info['chunked_file_path']
+            if chunked_file_path and os.path.exists(chunked_file_path):
+                os.remove(chunked_file_path)
+            chunked_log_file_path = chunk_file_info['chunked_log_file_path']
+            if chunked_log_file_path and os.path.exists(chunked_log_file_path):
+                os.remove(chunked_log_file_path)
+
+        # 更新块相关数据
+        FileStatusManager.update_filestatus(name, file_path,
+                                            {'chunked_file_path': '',
+                                                    'chunked_log_file_path': '',
+                                                    'chunk_num': 0}
+                                            )
 
 def custom_server():
     """
@@ -360,6 +441,7 @@ def save_message_dequeues():
     :return:
     """
     global WAITING_ASYNC_TASK_QUEUE
+    global NOW_LOADER_DATA
     data = []
     for item in WAITING_ASYNC_TASK_QUEUE:
         if item is None:
@@ -368,6 +450,10 @@ def save_message_dequeues():
     if data:
         with open('cache/message_queue0.json', 'w',  encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False)
+
+    if NOW_LOADER_DATA and isinstance(NOW_LOADER_DATA, list) and len(NOW_LOADER_DATA) > 3:
+        record_loader_info(NOW_LOADER_DATA[0], NOW_LOADER_DATA[1], NOW_LOADER_DATA[2], NOW_LOADER_DATA[3])
+
 
 
 def load_message_dequeues():

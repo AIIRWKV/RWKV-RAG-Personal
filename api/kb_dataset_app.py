@@ -330,3 +330,20 @@ async def batch_cancel_file(body: dict):
     update_file_path_list = [file_path for file_path, status in file_status_list if status == 'waitinglist']
     files_status_manager.batch_update_file_status(update_file_path_list, name, 'cancel')
     return {"code": 200, "msg": 'ok', "data": {}}
+
+
+@router.post('/knowledge/file_chunk_list')
+async def file_chunk_list(body: dict):
+    """
+    获取数据集文件的块数据列表
+    :return:
+    """
+
+
+@router.post('/knowledge/disable_chunk')
+async def disable_chunk(body: dict):
+    """
+    禁用数据集里某个chunk
+    :param body:
+    :return:
+    """
