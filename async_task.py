@@ -108,6 +108,17 @@ class FileStatusManager:
             db.execute(f"delete from file_status where collection_name = ? and file_path = ?", (name, file_path))
             return db.rowcount
 
+    @staticmethod
+    def get_file_status(name: str, file_path: str):
+        with SqliteDB(SQLITE_DB_PATH) as db:
+            db.execute(f"select status from file_status where collection_name = ? "
+                       f"and file_path = ?", (name, file_path))
+            result = db.fetchone()
+            if result:
+                return 1, result[0]
+            else:
+                return 0, None
+
 
 
 class IndexManager:
@@ -183,6 +194,11 @@ def custom_do_loader(task:list):
 
     if not os.path.exists(log_output_dir):
         os.makedirs(log_output_dir)
+    code, current_status = FileStatusManager.get_file_status(name, file_path)
+    if code == 0:
+        return
+    if current_status == 'cancel':
+        return
 
     with open(log_file_path, 'a', encoding='utf-8') as wf:
         wf.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  开始处理文件：{file_path}\n")

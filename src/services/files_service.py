@@ -58,7 +58,8 @@ valid_status = ['unprocess', # 未处理
                 'processed',  # 处理完成
                 'failed',  # 处理失败
                 'deleting', # 删除中
-                'delete_failed'  # 删除失败
+                'delete_failed', # 删除失败
+                'cancel', # 取消
                 ]
 
 

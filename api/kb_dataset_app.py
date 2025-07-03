@@ -5,7 +5,6 @@
 import os
 from datetime import date, datetime
 
-from Cython.Shadow import returns
 from fastapi import APIRouter
 
 from api import default_knowledge_base_dir
@@ -157,7 +156,7 @@ async def delete_by_file(body: dict):
         return {'code': 400, 'msg': '知识库里没有这个文件信息'}
     if status == 'deleting':
         return {'code': 400, 'msg': '正在删除中，不能重复删除'}
-    if status in ('processed','failed', 'delete_failed'):
+    if status in ('processed','failed', 'delete_failed', 'cancel'):
         files_status_manager.update_file_status(file_path, name, 'deleting')
         MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value,
                            name, file_path, 0, None, -1, '', ''))
@@ -183,7 +182,7 @@ async def batch_delete_by_file(body: dict):
         return {'code': 400, 'msg': '知识库里没有这些文件信息'}
     update_file_path_list = []
     for file_path, status in file_status_list:
-        if status in ('processed', 'failed', 'delete_failed'):
+        if status in ('processed', 'failed', 'delete_failed', 'cancel'):
             update_file_path_list.append(file_path)
             MESSAGE_QUEUE.put((AsyncTaskType.DELETE_DATA_BY_FILE.value,
                                name, file_path, 0, None, -1, '', ''))
@@ -266,6 +265,17 @@ async def cancel_file(body: dict):
     """
     name: str = body.get('name')
     file_path: str = body.get('file_path')
+    if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
+    code, status = files_status_manager.get_file_status_info(file_path, name)
+    if code == 0:
+        return {'code': 400, 'msg': '知识库里没有这些文件信息'}
+    if status != 'waitinglist':
+        return {'code': 400, 'msg': '只有正在排队入库的文件才能取消'}
+
+
+    files_status_manager.update_file_status(file_path, name, 'cancel')
+    return {"code": 200, "msg": 'ok', "data": {}}
 
 
 @router.post('/knowledge/batch_cancel_file')
@@ -277,3 +287,11 @@ async def batch_cancel_file(body: dict):
     """
     name: str = body.get('name')
     file_path_list: str = body.get('file_path_list')
+    if not (name and file_path_list and isinstance(file_path_list, list) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径参数不合法', "data": {}}
+    code, file_status_list = files_status_manager.get_file_status_list(file_path_list, name)
+    if code == 0:
+        return {'code': 400, 'msg': '知识库里没有这些文件信息'}
+    update_file_path_list = [file_path for file_path, status in file_status_list if status == 'waitinglist']
+    files_status_manager.batch_update_file_status(update_file_path_list, name, 'cancel')
+    return {"code": 200, "msg": 'ok', "data": {}}

@@ -53,6 +53,7 @@ async def get_message_queue():
         return {"code": 200, "msg": '消息队列为空', "data": []}
     data = []
     while len(data) < 5 and not MESSAGE_QUEUE.empty():
+        # 每次取五个
         item = MESSAGE_QUEUE.get(timeout=2)
         data.append(item)
     return {"code": 200, "msg": 'ok', "data": data}
