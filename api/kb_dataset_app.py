@@ -3,7 +3,8 @@
 知识库里的单个数据集相关操作
 """
 import os
-from datetime import date, datetime
+from datetime import date
+from typing import List
 
 from fastapi import APIRouter
 
@@ -103,6 +104,40 @@ async def archive_file_knowledgebase(body: dict):
                        ''         # 日志位置
                        ))
     return {"code": 200, "msg": 'ok', "data": {}}
+
+
+@router.post('/knowledgebase/batch_archive_file')
+async def archive_file_knowledgebase_batch(body: dict):
+    """
+    批量入库切片
+    :param body:
+    :return:
+    """
+    name: str = body.get('name')
+    file_path_list: List[str] = body.get('file_path_list')
+    chunk_size: int = 256
+    if not (name and file_path_list and isinstance(file_path_list, list) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
+
+    if not (isinstance(chunk_size, int) and 100<chunk_size<=1024):
+        return {"code": 400, "msg": '分词长度不合法，请输入100-1024的整数', "data": {}}
+    file_path_list = [file_path.strip() for file_path in file_path_list if os.path.exists(file_path.strip())
+                      and not os.path.isdir(file_path.strip())]
+
+    _, new_file_path_liat = files_status_manager.batch_add_files(file_path_list, name, 'waitinglist')
+
+    for file_path in new_file_path_liat:
+        MESSAGE_QUEUE.put((AsyncTaskType.LOADER_DATA_BY_FILE.value,
+                           name, # 知识库名称
+                           file_path,  # 文件路径
+                           chunk_size,  # 分块大小
+                           '',  # 文件名称
+                           -1,         # 起始位置
+                           '',        # 分块数据存储路径
+                           ''         # 日志位置
+                           ))
+    return {"code": 200, "msg": 'ok', "data": {}}
+
 
 @router.post('/knowledgebase/archive_file_reload')
 async def archive_file_knowledgebase_again(body: dict):

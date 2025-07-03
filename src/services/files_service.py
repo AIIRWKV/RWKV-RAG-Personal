@@ -115,6 +115,25 @@ class FileStatusManager:
                        f" values (?,?,?,datetime('now', 'localtime'))",(file_path,collection_name,status))
         return 1
 
+    def batch_add_files(self, file_path_list, collection_name, status='processed'):
+        """
+        批量添加数据
+        :param file_path_list:
+        :param collection_name:
+        :param status:
+        :return:
+        """
+        with SqliteDB(self.db_path) as db:
+            _, file_status_list = self.get_file_status_list(file_path_list, collection_name)
+            all_key = set([line[0] for line in file_status_list])
+            new_file_path_list = [file_path for file_path in file_path_list if file_path not in all_key]
+            if new_file_path_list:
+                db.execute(f"insert into {status_table_name} (file_path,collection_name,status,last_updated)"
+                           f" values (?,?,?,datetime('now', 'localtime'))",
+                           [(file_path, collection_name, status) for file_path in new_file_path_list])
+                return db.rowcount, new_file_path_list
+            return 0, []
+
     def check_file_exists(self,file_path, collection_name):
         with SqliteDB(self.db_path) as db:
             db.execute(f"select count(1) from {status_table_name} where collection_name = ? "
