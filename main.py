@@ -16,6 +16,8 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from configuration import (SERVER_PORT,
                            MESSAGE_QUEUE
@@ -28,7 +30,7 @@ from api.llm_app import router as llm_router
 from api.model_app import router as model_router
 from api.search_app import router as search_router
 
-app = FastAPI()
+app = FastAPI(title='RWKV RAG API')
 
 # 假设前端文件在 "frontend/" 目录下
 app.mount("/frontend_out", StaticFiles(directory="frontend_out", html=True), name="frontend_out")
@@ -40,6 +42,23 @@ app.include_router(llm_router, prefix='/api')
 app.include_router(model_router, prefix='/api')
 app.include_router(search_router, prefix='/api')
 
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    使用统一的参数校验错误逻辑
+    :param request:
+    :param exc:
+    :return:
+    """
+    return JSONResponse(
+        status_code=200,
+        content={
+            "code": 400,
+            "msg": "参数校验失败",
+            "details": [{"field": error["loc"][-1], "error": error["msg"]} for error in exc.errors()]
+        }
+    )
 
 @app.get('/api/ok')
 async def ok():

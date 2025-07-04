@@ -2,19 +2,24 @@
 """
 跟知识库操作接口
 """
-import re
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from api import (index_service_worker,
                  files_status_manager)
+from api.schema.kb_schema import AddCollectionFrom
+from api.response import BaseResponse
+from api.response.kb_response import (CollectionListResponse,
+                                      CollectionFileListResponse,
+                                      CollectionFileListCountResponse)
 
 
 router = APIRouter(tags=["知识库"])
 
 
-@router.get('/knowledgebase/list')
-async def get_collection_list(keyword: str=None, need_count: bool=False):
+@router.get('/knowledgebase/list', summary='获取知识库列表',
+            response_model=CollectionListResponse)
+async def get_collection_list(keyword: str = Query(default=None, description='搜索关键字'),
+                              need_count: bool = Query(default=False, description='是否需要返回文件数量')):
     """
     获取知识库列表
     """
@@ -29,17 +34,12 @@ async def get_collection_list(keyword: str=None, need_count: bool=False):
     return {'code': 200, 'data': [{'name': i[0], 'meta': i[1], 'count': collection_counts_dict.get(i[0], 0)} for i in collection_list], 'msg': 'ok'}
 
 
-@router.post('/knowledgebase/add')
-async def add_collection(body: dict):
+@router.post('/knowledgebase/add', summary='添加知识库', response_model=BaseResponse)
+async def add_collection(body: AddCollectionFrom):
     """
     添加知识库
     """
-    name = body.get('name')
-    if not name:
-        return {"code": 400, "msg": '知识库名称不能为空', "data": {}}
-    collection_name_rule = r'^[a-zA-Z0-9][a-zA-Z0-9_]{1,31}[a-zA-Z0-9]$'
-    if not re.match(collection_name_rule, name):
-        return {"code": 400, "msg": '知识库名称不合法,长度3-32的英文字符串', "data": {}}
+    name = body.name
 
     if index_service_worker.has_collection({'collection_name': name}):
         return {"code": 400, "msg": '知识库已存在', "data": {}}
@@ -50,8 +50,8 @@ async def add_collection(body: dict):
     return {"code": 200, "msg": 'ok', "data": {}}
 
 
-@router.get('/knowledgebase/delete')
-async def delete_collection(name: str):
+@router.get('/knowledgebase/delete', summary='删除知识库', response_model=BaseResponse)
+async def delete_collection(name: str = Query(description='知识库名称')):
     """
     删除知识库
     """
@@ -64,8 +64,11 @@ async def delete_collection(name: str):
     return {"code": 200, "msg": 'ok', "data": {}}
 
 
-@router.get('/knowledgebase/file_list')
-async def get_collection_file_list(name: str, page: int=1, page_size: int=100, keyword: str=None):
+@router.get('/knowledgebase/file_list', summary='获取知识库文件列表', response_model=CollectionFileListResponse)
+async def get_collection_file_list(name: str = Query(description='知识库名称'),
+                                   page: int= Query(default=1, description='页码'),
+                                   page_size: int= Query(default=100, description='页大小'),
+                                   keyword: str= Query(default=None, description='搜索关键字')):
     """
     获取知识库下所有知识文件列表
     """
@@ -77,8 +80,9 @@ async def get_collection_file_list(name: str, page: int=1, page_size: int=100, k
     return {"code": 200, "msg": 'ok', "data": result}
 
 
-@router.get('/knowledgebase/file_list_count')
-async def get_collection_file_list_count(name: str, keyword: str=None):
+@router.get('/knowledgebase/file_list_count', summary='获取知识库文件数量', response_model=CollectionFileListCountResponse)
+async def get_collection_file_list_count(name: str = Query(description='知识库名称'),
+                                         keyword: str= Query(default=None, description='搜索关键字')):
     """
     获取知识库下所有知识文件数量
     """
