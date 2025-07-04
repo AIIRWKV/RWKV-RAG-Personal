@@ -52,6 +52,11 @@ class ServiceWorker(AbstractServiceWorker):
             self.init_vectordb_db()
 
     def index_texts(self, cmd: dict):
+        """
+        添加数据到向量数据库
+        :param cmd:
+        :return:
+        """
         return self.vectordb_manager.add(cmd)
 
     def show_collections(self, cmd: dict):
@@ -73,10 +78,10 @@ class ServiceWorker(AbstractServiceWorker):
        return self.vectordb_manager.search_nearby(cmd)
 
     def delete(self, cmd: dict):
-        return self.vectordb_manager.delete(keys=cmd.get('keys', []), collection_name=cmd.get('collection_name'),
-                                            metadatas=cmd.get('metadatas'))
+        return self.vectordb_manager.delete(cmd)
 
-    def get_ids_by_metadatas(self, cmd: dict):
-        return self.vectordb_manager.get_ids_by_metadatas(collection_name=cmd.get('collection_name'),
-                                                          where=cmd.get('where'), limit=cmd.get('limit'),
-                                                          offset=cmd.get('offset'))
+    def get(self, cmd:dict):
+        return self.vectordb_manager.get(cmd)
+
+    def update(self, cmd: dict):
+        return self.vectordb_manager.update(cmd)

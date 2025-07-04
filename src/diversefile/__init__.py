@@ -1,5 +1,4 @@
 ﻿# coding=utf-8
-import json
 from typing import IO
 from datetime import datetime
 

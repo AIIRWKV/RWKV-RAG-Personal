@@ -226,6 +226,42 @@ class FileStatusManager:
                            f"and file_path in ({','.join(['?'] * len(file_path_list))})",(is_used,collection_name,*file_path_list))
             return db.rowcount
 
+    def get_chunked_file_path(self, file_path, collection_name):
+       """
+       获取文件的chunked数据路径
+       :param file_path:
+       :param collection_name:
+       :return:
+       """
+       with SqliteDB(self.db_path) as db:
+            db.execute(f"select chunked_file_path,chunk_num from {status_table_name} where collection_name = ? "
+                       f"and file_path = ?", (collection_name, file_path))
+            result = db.fetchone()
+            if result:
+                return 1, result
+            else:
+                return 0, [None, 0]
+    def update_chunked_num(self, file_path, collection_name, delta):
+        """
+        通过自增/自减 更新chunked_num的值
+        :param file_path:
+        :param collection_name:
+        :param delta:
+        :return:
+        """
+        with SqliteDB(self.db_path) as db:
+            if delta > 0:
+                db.execute(f"update {status_table_name} set chunk_num = chunk_num + ?,"
+                           f"last_updated = datetime('now', 'localtime') where collection_name = ? "
+                           f"and file_path = ?",(delta,collection_name,file_path))
+            elif delta < 0:
+                db.execute(f"update {status_table_name} set chunk_num = chunk_num - ?,"
+                           f"last_updated = datetime('now', 'localtime') where collection_name = ? "
+                           f"and file_path = ?",(-delta,collection_name,file_path))
+            else:
+                return 0
+            return db.rowcount
+
     def get_collection_files(self, collection_name, page:int=1, page_size:int=100, keyword:str=None):
         """
         获取加入知识库的文件列表

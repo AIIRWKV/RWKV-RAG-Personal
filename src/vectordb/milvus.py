@@ -98,8 +98,11 @@ class MilvusManager(AbstractVectorDBManager, ABC):
         # index the value
         return True
 
-    def delete(self, keys: List[str], collection_name: str, metadatas: dict=None):
+    def delete(self, kwargs: dict):
         # TODO 待支持metadatas条件删除
+        keys: List[str] = kwargs.get("keys") or None
+        collection_name: str = kwargs.get('collection_name')
+        metadatas: dict = kwargs.get('metadatas') or None
         if not keys:
             return True
         client = self.client()
@@ -118,7 +121,6 @@ class MilvusManager(AbstractVectorDBManager, ABC):
         pass
 
     def search_nearby(self, kwargs: dict):
-        print(kwargs)
         collection_name = kwargs.get('collection_name')
         embeddings = kwargs.get('embeddings')
         client = self.client()
@@ -143,12 +145,7 @@ class MilvusManager(AbstractVectorDBManager, ABC):
         documents = [i['text'] for i in documents]
         return {'documents': documents, 'metadatas': []}
 
+    def get(self, kwargs: dict):
+        # TODO 待完善
+        pass
 
-    def get_ids_by_metadatas(self, collection_name: str, where: dict, limit: int = 500, offset: int = 0):
-        client = self.client()
-        try:
-            collection = client.get_collection(collection_name)
-        except:
-            raise VectorDBCollectionNotExistError()
-        data = collection.get(where=where, limit=limit, offset=offset, include=[])
-        return data

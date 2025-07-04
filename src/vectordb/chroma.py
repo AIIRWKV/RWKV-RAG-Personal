@@ -7,7 +7,7 @@ import subprocess
 import sys
 from abc import ABC
 from datetime import datetime
-from typing import List
+from typing import List, Tuple, Any
 
 import psutil
 
@@ -133,20 +133,17 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
         # index the value
         return True
 
-    def delete(self, keys: List[str], collection_name: str, metadatas: dict=None):
+    def delete(self, kwargs: dict):
         # keys 和 metadatas 至少一个不能为空
+        keys: List[str] = kwargs.get("keys") or None
+        collection_name: str = kwargs.get('collection_name')
+        metadatas: dict = kwargs.get('metadatas') or None
         params = {}
         if keys:
             params['ids'] = keys
         if metadatas and isinstance(metadatas, dict):
-            key_list = list(metadatas.keys())
-            if len(key_list) == 1:
-                where = {key_list[0]: metadatas[key_list[0]]}
-            else:
-                tmp = []
-                for key in key_list:
-                    tmp.append({key: metadatas[key]})
-                where = {"$and": tmp}
+            new_metadatas = {k: ('$eq',  v) for k, v in metadatas.items()}
+            where = self.__where_metadatas(new_metadatas)
             params['where'] = where
 
         if not params:
@@ -164,7 +161,7 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
 
     def update(self, kwargs: dict):
         keys = kwargs.get("keys")
-        values = kwargs["texts"]
+        values = kwargs.get("texts")
         collection_name = kwargs.get('collection_name')
         embeddings = kwargs.get('embeddings')
         metadatas = kwargs.get('metadatas')
@@ -193,7 +190,7 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
             raise VectorDBError("update indexing failed")
 
     @staticmethod
-    def __where_metadatas(metadata_field: dict):
+    def __where_metadatas(metadata_field: dict[str, Tuple[str, Any]]):
         """
         :param metadata_field: {"name": ('$nin', [1,2,3]) # not in
                              "price": ('$eq', 1)  # 等于1，
@@ -257,12 +254,26 @@ class ChromaDBManager(AbstractVectorDBManager, ABC):
             metadata = []
         return {'documents': document, 'metadatas': metadata, 'ids': search_result['ids']}
 
-    def get_ids_by_metadatas(self, collection_name: str, where: dict, limit: int = 500, offset: int = 0):
+    def get(self, kwargs: dict):
+        keys: List[str] = kwargs.get("keys") or None
+        collection_name = kwargs.get('collection_name')
+        limit: int = kwargs.get('limit')
+        offset: int = kwargs.get('offset')
+        metadatas: dict = kwargs.get('metadatas') or None
+        include: List[str] = kwargs.get('include')
+        if not include:
+            include = ['documents', 'metadatas', 'ids']
         client = self.client()
+        if metadatas:
+            where = self.__where_metadatas({k: ('$eq', v) for k,v in metadatas.items()})
+        else:
+            where = None
+
         try:
             collection = client.get_collection(collection_name)
         except:
             raise VectorDBCollectionNotExistError()
-        data = collection.get(where=where, limit=limit, offset=offset, include=[])
+
+        data = collection.get(ids=keys, where=where, limit=limit, offset=offset, include=include)
         return data
 

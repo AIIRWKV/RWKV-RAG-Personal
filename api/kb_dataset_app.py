@@ -2,6 +2,7 @@
 """
 知识库里的单个数据集相关操作
 """
+import json
 import os
 from datetime import date
 from typing import List
@@ -338,6 +339,48 @@ async def file_chunk_list(body: dict):
     获取数据集文件的块数据列表
     :return:
     """
+    name: str = body.get('name')
+    file_path: str = body.get('file_path')
+    page: int = body.get('page', 1)
+    page_size: int = body.get('page_size', 10)
+    if not (name and file_path and isinstance(file_path, str) and isinstance(name, str)):
+        return {"code": 400, "msg": '知识库名称和文件路径不能为空', "data": {}}
+    start = (page - 1) * page_size
+    end = page * page_size
+    chunked_list = []
+    cmd = {
+        'collection_name': name,
+        'limit':  page_size,
+        'offset': start,
+        'metadatas':{'source': file_path}
+    }
+    data = index_service_worker.get(cmd)
+    return data
+    # 因为还有去向量数据库查询分块数据的使用情况，所以直接去向量数据库查看数据，不用去备份的chunked_file_path里获取
+    #_, result = files_status_manager.get_chunked_file_path(file_path, name)
+    # chunked_file_path, chunk_num = result
+    # if chunked_file_path and os.path.exists(chunked_file_path) and os.path.isfile(chunked_file_path):
+    #     ids = []
+    #     with open(chunked_file_path, 'r', encoding='utf-8') as rf:
+    #         count = 0
+    #         for line in rf:
+    #             count += 1
+    #             if count < start:
+    #                 continue
+    #             if count > end:
+    #                 break
+    #             try:
+    #                 obj = json.loads(line)
+    #                 chunked_list.append({'id': obj['key'], 'text': obj['text']})
+    #                 ids.append('')
+    #             except:
+    #                 continue
+    #         return {'code': 200, 'msg': 'ok', 'data':chunked_list, 'total': chunk_num, 'page': page, 'page_size': page_size}
+    #
+    # else:
+    #     # 直接去向量数据库查询
+    #     pass
+
 
 
 @router.post('/knowledge/disable_chunk')
@@ -347,3 +390,106 @@ async def disable_chunk(body: dict):
     :param body:
     :return:
     """
+    name:str = body.get('name')
+    key:str = body.get('key')
+
+    if not (name and key and isinstance(name, str) and isinstance(key, str)):
+        return {"code": 400, "msg": '知识库名称、文件路径和数据块id不能为空', "data": {}}
+    cmd = {'collection_name': name, 'keys':[key], 'metadatas': [{'is_active': 0}]}
+    index_service_worker.update(cmd)
+    return {'code': 200, 'msg': 'ok', 'data': {}}
+
+
+@router.post('/knowledge/batch_disable_chunk')
+async def batch_disable_chunk(body: dict):
+    """
+    禁用数据集里多个chunk
+    :param body:
+    :return:
+    """
+    name:str = body.get('name')
+    keys:list = body.get('keys')
+    if not (name and keys and  isinstance(name, str) and isinstance(keys, list)):
+        return {"code": 400, "msg": '知识库名称、文件路径和数据块id不能为空'}
+
+    cmd = {'collection_name': name, 'keys': keys, 'metadatas': [{'is_active': 0}]}
+    index_service_worker.update(cmd)
+    return {'code': 200, 'msg': 'ok', 'data': {}}
+
+
+@router.post('/knowledge/active_chunk')
+async def active_chunk(body: dict):
+    """
+    启用数据集里某个chunk
+    :param body:
+    :return:
+    """
+    name:str = body.get('name')
+    key:str = body.get('key')
+
+    if not (name and key and isinstance(name, str) and isinstance(key, str)):
+        return {"code": 400, "msg": '知识库名称、文件路径和数据块id不能为空', "data": {}}
+    cmd = {'collection_name': name, 'keys':[key], 'metadatas': [{'is_active': 1}]}
+    index_service_worker.update(cmd)
+    return {'code': 200, 'msg': 'ok', 'data': {}}
+
+
+@router.post('/knowledge/batch_active_chunk')
+async def batch_active_chunk(body: dict):
+    """
+    启用数据集里多个chunk
+    :param body:
+    :return:
+    """
+    name:str = body.get('name')
+    keys:list = body.get('keys')
+    if not (name and keys and  isinstance(name, str) and isinstance(keys, list)):
+        return {"code": 400, "msg": '知识库名称、文件路径和数据块id不能为空'}
+
+    cmd = {'collection_name': name, 'keys': keys, 'metadatas': [{'is_active': 1}]}
+    index_service_worker.update(cmd)
+    return {'code': 200, 'msg': 'ok', 'data': {}}
+
+
+@router.post('/knowledge/delete_chunk')
+async def delete_chunk(body: dict):
+    """
+    删除数据集里某个chunk
+    :param body:
+    :return:
+    """
+    name: str = body.get('name')
+    file_path: str = body.get('file_path')
+    key: str = body.get('key')
+    if not (name and key and isinstance(name, str) and isinstance(key, str)
+            and file_path and isinstance(file_path, str)):
+        return {"code": 400, "msg": '知识库名称、文件路径和数据块id不能为空', "data": {}}
+
+    cmd =  {'collection_name': name, 'keys':[key]}
+    if file_path:
+        cmd['metadatas'] = {'source': file_path}
+    index_service_worker.delete(cmd)
+    files_status_manager.update_chunked_num(file_path, name, -1)
+
+    return {"code": 200, "msg": 'ok', "data": {}}
+
+
+@router.post('/knowledge/batch_delete_chunk')
+async def batch_delete_chunk(body: dict):
+    """
+    批量删除数据集里多个chunk
+    :param body:
+    :return:
+    """
+    name: str = body.get('name')
+    file_path: str = body.get('file_path')
+    keys: list = body.get('keys')
+    if not (name and keys and isinstance(name, str) and
+            isinstance(keys, list) and file_path and isinstance(file_path,str)):
+        return {"code": 400, "msg": '知识库名称、文件路径和数据块id不能为空', "data": {}}
+    cmd =  {'collection_name': name, 'keys':keys}
+    if file_path:
+        cmd['metadatas'] = {'source': file_path}
+    index_service_worker.delete(cmd)
+    files_status_manager.update_chunked_num(file_path, name, -len(keys))
+    return {"code": 200, "msg": 'ok', "data": {}}

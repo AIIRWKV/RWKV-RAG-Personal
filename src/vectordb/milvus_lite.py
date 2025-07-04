@@ -86,8 +86,11 @@ class MilvusLiteManager(AbstractVectorDBManager, ABC):
             raise VectorDBError('数据添加失败')
         return True
 
-    def delete(self, keys: List[str], collection_name: str, metadatas: dict=None):
+    def delete(self, kwargs: dict):
         # TODO 待支持metadatas条件删除
+        keys: List[str] = kwargs.get("keys") or None
+        collection_name: str = kwargs.get('collection_name')
+        metadatas: dict = kwargs.get('metadatas') or None
         if not keys:
             return True
         client = self.client()
@@ -117,5 +120,6 @@ class MilvusLiteManager(AbstractVectorDBManager, ABC):
             return {'documents': [i['entity']['text'] for i in search_result[0]], 'metadatas': []}
         return {'documents': [], 'metadatas': []}
 
-    def get_ids_by_metadatas(self, collection_name: str, where: dict, limit: int = 500, offset: int = 0):
-        return []
+    def get(self, kwargs: dict):
+        # TODO 待完善
+        pass

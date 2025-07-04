@@ -88,10 +88,14 @@ class AbstractVectorDBManager(ABC):
         """
         pass
 
-    def delete(self, keys: List[str], collection_name: str, metadatas: dict=None):
+    def delete(self, kwargs: dict):
         """
-        删除向量
+        删除向量，
         :param kwargs:
+            keys: List[str], id 过滤条件
+            collection_name: str， 集合名称
+            metadatas: dict， 元数据过滤条件
+            keys 和 metadatas 至少一个不能为空
         :return:
         """
         pass
@@ -114,7 +118,7 @@ class AbstractVectorDBManager(ABC):
     @abstractmethod
     def search_nearby(self, kwargs: dict) -> list[str]:
         """
-        搜索向量
+        相似检索
         :param kwargs:必须有如下键：
             collection_name: str
             embeddings: List[numpy.ndarray[numpy.float16]]
@@ -125,6 +129,20 @@ class AbstractVectorDBManager(ABC):
         :return:
         """
         pass
+
+    @abstractmethod
+    def get(self, kwargs: dict):
+        """
+        精准检索
+        :param kwargs:
+                    keys: List[str]
+                    collection_name: str
+                    limit: int
+                    offset: int
+                    metadatas: dict  {'name': 11} 表示过滤元数据 name=11的值
+                    include: List[str] 返回字段
+        :return:
+        """
 
     @staticmethod
     def padding_vectors(vector: list):
